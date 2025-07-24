@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+    <meta charset="UTF-8">
+    <title>REGISTRATION</title>
+
+    <style>
+        body {
+  font-family: 'Courier New', monospace;
+  font-size: 25px;
+  background-color: rgb(100, 100, 100);
+     }
+
+#registration{text-align: center;}
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+
+
+    <script>
+ var stompClient = null;
+
+ setTimeout(connect,500);
+
+        function setConnected(connected) {
+         $("#registerButton").prop("disabled", connected);
+         $("#logInButton").prop("disabled", connected);
+        }
+
+        function frameHandler(frame) {
+            setConnected(true);
+            console.log('Connected: ' + frame);
+            stompClient.subscribe('/receive/message', function (message) {
+              playSound('registered_sound');
+              window.alert(message.body);
+            });
+        }
+
+           function connect() {
+            stompClient = new window.StompJs.Client({
+                webSocketFactory: function () {
+                    return new WebSocket("ws://localhost:8080/register");
+                }
+            });
+            stompClient.onConnect = function (frame) {
+                frameHandler(frame)
+                setConnected(false)
+            };
+            stompClient.onWebsocketClose = function () {
+                onSocketClose();
+            };
+            stompClient.activate();
+        }
+
+
+         function sendUser() {
+            stompClient.publish({
+                destination:"/app/register",
+                body: JSON.stringify({
+                    'username': $("#username").val(),
+                    'password': $("#password").val(),
+                    'passwordConfirm': $("#passwordConfirm").val()
+                })
+            });
+        }
+
+        $(function () {
+           $("#registerButton").click(function () {
+                sendUser();
+            });
+
+        });
+
+       function playSound(id){
+          var audio = document.getElementById(id);
+           audio.play();
+       }
+
+       function logIn() {
+          window.location = "http://localhost:8080/html/hello.html";
+        }
+</script>
+</head>
+
+<body>
+
+<div id="registration">
+
+        <h2>REGISTRATION FORM</h2>
+
+    <p>New user name: <input type="text" id="username"></p>
+    <p>New user password: <input type="password" id="password"></p>
+    <p>New user password confirm: <input type="password" id="passwordConfirm"></p>
+
+
+        <button  id="registerButton" disabled type="submit">REGISTER YOURSELF AS USER</button>
+
+    <div id="controls">
+        <button id="logInButton" disabled type="button" class="buttonLogIn" onclick="logIn()" >LOGIN</button>
+    </div>
+
+
+    <img class="displayed" src="../img/black.png" alt="" width="240" height="384" >
+
+
+
+</div>
+<audio id="registered_sound">
+    <source  src="http://localhost:8080/sounds/registered.mp3" type="audio/mpeg"></source>
+    <source  src="http://localhost:8080/sounds/registered.ogg" type="audio/ogg"></source>
+</audio>
+</body>
+</html>

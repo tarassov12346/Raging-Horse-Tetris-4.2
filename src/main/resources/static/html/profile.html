@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tetris</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.css" rel="stylesheet"/>
+    <style>
+        body {
+        font-family: 'Courier New', monospace;
+        font-size: 25px;
+        background-color: rgb(204, 102, 0);
+        }
+
+        #controls2{text-align: center;}
+        #controls1{text-align: center;}
+
+       #startGameButton {
+
+        font-size: 16px;
+        top:50%;
+        background-color:#0a0a23;
+        color: #fff;
+        }
+
+        #uploadButton {
+
+        font-size: 16px;
+        top:50%;
+        background-color:#0a0a23;
+        color: #fff;
+        }
+
+       #header{text-align: center;}
+
+       #forms{text-align: center;font-family: 'Courier New', monospace;font-size: 25px;}
+
+       .input-file {
+	position: relative;
+	display: inline-block;
+}
+.input-file-btn {
+	position: relative;
+	display: inline-block;
+	cursor: pointer;
+	outline: none;
+	text-decoration: none;
+	font-size: 14px;
+	vertical-align: middle;
+	color: rgb(255 255 255);
+	text-align: center;
+	border-radius: 4px;
+	background-color: #419152;
+	line-height: 22px;
+	height: 40px;
+	padding: 10px 20px;
+	box-sizing: border-box;
+	border: none;
+	margin: 0;
+	transition: background-color 0.2s;
+}
+.input-file-text {
+	padding: 0 10px;
+	line-height: 40px;
+	display: inline-block;
+}
+.input-file input[type=file] {
+	position: absolute;
+	z-index: -1;
+	opacity: 0;
+	display: block;
+	width: 0;
+	height: 0;
+}
+
+       img.mugShot {
+       display: block;
+       margin-left: auto;
+       margin-right: auto }
+
+       img.snapShot {
+       float: left;
+       width: 600px;
+       height: 500px;}
+
+       img.snapShotBest {
+       float: right;
+       width: 600px;
+       height: 500px;}
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script>
+
+        var stompClient = null;
+        setTimeout(connect,500);
+
+
+        function setConnected(connected) {
+            $("#startGameButton").prop("disabled", connected);
+        }
+
+        function frameHandlerPlayerStat(frame) {
+            setConnected(true);
+            console.log('Connected: ' + frame);
+            stompClient.subscribe('/receive/playerStat', function (game) {
+                showPlayerStat(game.body);
+            });
+        }
+
+        function frameHandlerPlayerAttemptsNumber(frame) {
+            setConnected(true);
+            console.log('Connected: ' + frame);
+            stompClient.subscribe('/receive/playerAttemptsNumber', function (number) {
+                showPlayerAttemptsNumber(number.body);
+            });
+        }
+
+        function showPlayerStat(game) {
+           var jsonGame = JSON.parse(game);
+           var player = jsonGame['playerName'];
+           var score = jsonGame['playerScore'];
+           $("#profileBox").text('Hello '+player+'!'+' Your best score is '+score);
+        }
+
+        function showPlayerAttemptsNumber(game) {
+           var jsonGame = JSON.parse(game);
+           var attempts = jsonGame['playerScore'];
+           $("#profileAttemptsBox").text('You have played '+attempts+' times!');
+        }
+
+        function connect() {
+
+        var wb = new WebSocket("ws://localhost:8080/websocket");
+
+        wb.binaryType = "arraybuffer";
+
+
+            stompClient = new window.StompJs.Client({
+                webSocketFactory: function () {
+                    return wb;
+                }
+            });
+            stompClient.onConnect = function (frame) {
+                frameHandlerPlayerStat(frame)
+                frameHandlerPlayerAttemptsNumber(frame)
+
+                 setConnected(false)
+
+                stompClient.publish({
+                destination:"/app/profile",
+                  body: JSON.stringify({
+                    '': ''
+                  })
+                })
+            };
+
+            stompClient.onWebsocketClose = function () {
+                onSocketClose();
+            };
+
+            playSound('profile_sound');
+            stompClient.activate();
+        }
+
+        function playSound(id){
+          var audio = document.getElementById(id);
+           audio.play();
+       }
+
+        function index() {
+            window.location = "http://localhost:8080/html/index.html";
+        }
+
+        $(function () {
+            $("#startGameButton").click(function () {
+                index();
+            });
+            $("#uploadButton").click(function () {
+               sendFile();
+            });
+        });
+
+         function sendFile() {
+            var file = document.getElementById('filename').files[0];
+            var base64String = "";
+            var reader = new FileReader();
+            reader.onload = function () {
+            base64String = reader.result.replace("data:", "")
+                    .replace(/^.+,/, "");
+            imageBase64Stringsep = base64String;
+            alert("Your avatar has been uploaded!");
+
+               stompClient.publish({
+                destination:"/app/upload",
+                  body:imageBase64Stringsep
+                })
+            }
+            reader.readAsDataURL(file);
+         }
+    </script>
+
+</head>
+<body>
+
+<h1 text align="center"> <b id="profileBox"> </b> </h1>
+<h2 text align="center"> <b id="profileAttemptsBox"> </b> </h2>
+<h3 text align="center"> <b id="profile"> LAST PLAY RESULT ******************YOUR MUGSHOT ****************BEST PLAY RESULT</b> </h3>
+<div id="controls1">
+    <button id="uploadButton"  type="button" class="buttonUpload" >Upload</button>
+</div>
+<form id="forms">
+    <label class="input-file">
+        <input type="file" id="filename" name="file">
+        <span class="input-file-btn">Choose your avatar</span>
+        <span class="input-file-text">8 kb max</span>
+    </label>
+</form>
+
+
+
+<img class="mugShot" src="/getPhoto" alt="" width="120" height="120">
+
+<div id="controls2">
+    <button id="startGameButton" disabled type="button" class="buttonStart" >Start</button>
+</div>
+
+<img class="snapShot" src="/getSnapShot" alt="" width="120" height="120">
+<img class="snapShotBest" src="/getSnapShotBest" alt="" width="120" height="120">
+
+<audio id="profile_sound">
+    <source  src="http://localhost:8080/sounds/profile.mp3" type="audio/mpeg"></source>
+    <source  src="http://localhost:8080/sounds/profile.ogg" type="audio/ogg"></source>
+</audio>
+
+</body>
+</html>

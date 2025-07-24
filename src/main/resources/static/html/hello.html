@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.css" rel="stylesheet"/>
+    <style>
+         body {
+  font-family: 'Courier New', monospace;
+  font-size: 25px;
+  background-color: rgb(255, 0, 0);
+}
+
+#controls{text-align: center;}
+
+.buttonStart {
+    position: absolute;
+    font-size: 16px;
+    top:50%;
+    background-color:#0a0a23;
+    color: #fff;
+}
+
+.buttonProfile {
+    font-size: 16px;
+    background-color:#0a0a11;
+    color: #fff;
+}
+
+.buttonAdmin {
+    font-size: 16px;
+    background-color:#0a0a11;
+    color: #fff;
+}
+
+#header{text-align: center;}
+
+#helloBox{font-size: 50px;}
+#bestPlayerBox{font-size: 35px;}
+#bestScoreBox{font-size: 35px;}
+
+img.displayed {
+    display: block;
+    margin-left: auto;
+    margin-right: auto }
+
+img.raging {
+    display: block;
+    margin-left: auto;
+    margin-right: auto }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script>
+        var stompClient = null;
+
+        setTimeout(connect,500);
+
+        function setConnected(connected) {
+            $("#startGameButton").prop("disabled", connected);
+            $("#adminButton").prop("disabled", connected);
+            $("#profileButton").prop("disabled", connected);
+        }
+
+        function frameHandlerDaoGame(frame) {
+            setConnected(true);
+            console.log('Connected: ' + frame);
+            stompClient.subscribe('/receive/daoGameObjects', function (daoGame) {
+                showDaoGame(daoGame.body);
+            });
+        }
+
+        function frameHandlerGame(frame) {
+            stompClient.subscribe('/receive/gameObjects', function (game) {
+                showGame(game.body);
+            });
+        }
+
+        function connect() {
+            stompClient = new window.StompJs.Client({
+                webSocketFactory: function () {
+                    return new WebSocket("ws://localhost:8080/websocket");
+                }
+            });
+            stompClient.onConnect = function (frame) {
+                frameHandlerDaoGame(frame)
+
+                 frameHandlerGame(frame)
+                 setConnected(false)
+
+                stompClient.publish({
+                destination:"/app/hello",
+                  body: JSON.stringify({
+                    '': ''
+                  })
+                })
+            };
+
+            stompClient.onWebsocketClose = function () {
+                onSocketClose();
+            };
+
+            playSound('hello_sound');
+
+            stompClient.activate();
+
+        }
+
+        function index() {
+            window.location = "http://localhost:8080/html/index.html";
+        }
+
+        function admin() {
+            window.location = "http://localhost:8080/html/admin.html";
+        }
+
+        function profile() {
+            window.location = "http://localhost:8080/html/profile.html";
+        }
+
+        function showDaoGame(game) {
+           var jsonDaoGame = JSON.parse(game);
+           var bestPlayer = jsonDaoGame['playerName'];
+           var bestScore = jsonDaoGame['playerScore'];
+            $("#bestPlayerBox").text('Wanna challenge the best player '+bestPlayer);
+            $("#bestScoreBox").text('with his score '+bestScore+'?');
+        }
+
+        function showGame(game) {
+           var jsonGame = JSON.parse(game);
+           var playerName = jsonGame['playerName'];
+             $("#helloBox").text('Hello ' + playerName + '! WELCOME TO RAGING HORSE TETRIS!');
+        }
+
+        $(function () {
+
+
+            $("#startGameButton").click(function () {
+                index();
+            });
+
+            $("#adminButton").click(function () {
+                admin();
+            });
+
+            $("#profileButton").click(function () {
+                profile();
+            });
+
+
+        });
+
+        function playSound(id){
+          var audio = document.getElementById(id);
+         if (id == 'snap_sound')
+           {
+             if (typeof audio.loop == 'boolean')
+               {
+                 audio.loop = true;
+               }
+             else
+               {
+                  audio.addEventListener('ended', function() {
+                  this.currentTime = 0;
+                  this.play();
+                      }, false);
+                  }
+           }
+           audio.play();
+        }
+    </script>
+</head>
+<body>
+
+
+
+<h1 text align="center"> <b id="helloBox"> </b> </h1>
+<h2 text align="center"> <b id="bestPlayerBox"> </b> </h2>
+<h3 text align="center"> <b id="bestScoreBox"></b> </h3>
+<img class="displayed" src="../img/black.png" alt="" width="240" height="384" >
+<img class="raging" src="../img/raging.jpg" alt="" width="120" height="120">
+
+<div id="controls">
+    <button id="startGameButton" disabled type="button" class="buttonStart" >Start</button>
+    <button id="profileButton" disabled type="button" class="buttonProfile" >Your Profile</button>
+    <button id="adminButton" disabled type="button" class="buttonAdmin" >Admin</button>
+</div>
+
+<audio id="hello_sound">
+    <source  src="http://localhost:8080/sounds/hello.mp3" type="audio/mpeg"></source>
+    <source  src="http://localhost:8080/sounds/hello.ogg" type="audio/ogg"></source>
+</audio>
+
+</body>
+</html>
