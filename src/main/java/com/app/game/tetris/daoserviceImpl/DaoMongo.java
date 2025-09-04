@@ -172,7 +172,7 @@ public class DaoMongo implements DaoMongoService {
     }
 
     @Override
-    public void loadMugShotIntoMongodb(String playerName, byte[] data){
+    public void loadMugShotIntoMongodb(String playerName, byte[] data) {
         String uri = mongoUri;
         MongoClient mongoClient = MongoClients.create(uri);
         MongoDatabase database = mongoClient.getDatabase("shopDB");
@@ -223,15 +223,15 @@ public class DaoMongo implements DaoMongoService {
             playwright.selectors().setTestIdAttribute("id");
             String js = "document.getElementById('gameStatusBox').innerHTML = 'Game OVER!!!'";
             page.evaluate(js);
-            js = "document.getElementById('playerBox').innerHTML = '"+state.getGame().getPlayerName()+"'";
+            js = "document.getElementById('playerBox').innerHTML = '" + state.getGame().getPlayerName() + "'";
             page.evaluate(js);
-            js = "document.getElementById('playerScoreBox').innerHTML = '"+ state.getGame().getPlayerScore() +"'";
+            js = "document.getElementById('playerScoreBox').innerHTML = '" + state.getGame().getPlayerScore() + "'";
             page.evaluate(js);
-            js = "document.getElementById('bestPlayerBox').innerHTML = '"+bestPlayerName+"'";
+            js = "document.getElementById('bestPlayerBox').innerHTML = '" + bestPlayerName + "'";
             page.evaluate(js);
-            js = "document.getElementById('bestPlayerScoreBox').innerHTML = '"+bestPlayerScore+"'";
+            js = "document.getElementById('bestPlayerScoreBox').innerHTML = '" + bestPlayerScore + "'";
             page.evaluate(js);
-            js = "document.getElementById('tetrisSpeedBox').innerHTML = 'Tetris at speed "+state.getGame().getPlayerScore() / 10+"'";
+            js = "document.getElementById('tetrisSpeedBox').innerHTML = 'Tetris at speed " + state.getGame().getPlayerScore() / 10 + "'";
             page.evaluate(js);
             page.waitForTimeout(3000);
             page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get(fileName)));

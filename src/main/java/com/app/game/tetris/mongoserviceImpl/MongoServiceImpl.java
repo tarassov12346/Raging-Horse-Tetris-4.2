@@ -18,19 +18,26 @@ public class MongoServiceImpl implements MongoService {
 
     @Override
     public void saveGame(SavedGame savedGame) {
-
         restTemplate.postForObject("http://mongo-service/save", savedGame, SavedGame.class);
-
-
     }
 
     @Override
     public Optional<SavedGame> gameRestart(String playerName) {
-        return  Optional.of(restTemplate.getForObject("http://mongo-service" + "/restart?playerName={playerName}", SavedGame.class, playerName));
+        return Optional.ofNullable(restTemplate.getForObject("http://mongo-service" + "/restart?playerName={playerName}", SavedGame.class, playerName));
     }
 
     @Override
     public void cleanSavedGameMongodb(String playerName) {
         restTemplate.delete("http://mongo-service" + "/delete?playerName={playerName}", playerName);
+    }
+
+    @Override
+    public void prepareMongoDBForNewPLayer(String playerName) {
+        restTemplate.getForObject("http://mongo-service" + "/prepare?playerName={playerName}", String.class, playerName);
+    }
+
+    @Override
+    public void cleanImageMongodb(String playerName, String fileName) {
+        restTemplate.delete("http://mongo-service" + "/deleteimage?playerName={playerName}?fileName={fileName}", playerName, fileName);
     }
 }

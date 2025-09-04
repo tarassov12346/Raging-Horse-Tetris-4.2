@@ -86,9 +86,7 @@ public class TetrisController {
     @MessageMapping("/hello")
     public void hello(Principal principal) {
         state = playGameService.initiateState(principal.getName());
-        if (!daoMongoService.isImageFilePresentInMongoDB(state.getGame().getPlayerName())) {
-            daoMongoService.prepareMongoDBForNewPLayer(state.getGame().getPlayerName());
-        }
+        mongoService.prepareMongoDBForNewPLayer(state.getGame().getPlayerName());
         sendGameToBeDisplayed(state.getGame());
         JSONObject jsonGameData = new JSONObject(gameService.getGameData(principal.getName()));
         sendDaoGameToBeDisplayed(playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")));

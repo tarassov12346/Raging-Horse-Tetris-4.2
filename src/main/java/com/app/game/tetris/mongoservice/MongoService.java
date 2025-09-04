@@ -11,4 +11,8 @@ public interface MongoService {
     Optional<SavedGame> gameRestart(String playerName);
 
     void cleanSavedGameMongodb(String playerName);
+
+    void prepareMongoDBForNewPLayer(String playerName);
+
+    void cleanImageMongodb(String playerName, String fileName);
 }
