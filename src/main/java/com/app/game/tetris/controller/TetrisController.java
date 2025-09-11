@@ -103,7 +103,7 @@ public class TetrisController {
 
     @MessageMapping("/upload")
     public void upload(String imageBase64Stringsep) {
-        daoMongoService.cleanImageMongodb(state.getGame().getPlayerName(), "");
+        mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "");
         daoMongoService.loadMugShotIntoMongodb(state.getGame().getPlayerName(), Base64.getDecoder().decode(imageBase64Stringsep));
     }
 
@@ -190,9 +190,9 @@ public class TetrisController {
         for (Roles role : daoUserService.findUserByUserName(state.getGame().getPlayerName()).getRoles()) {
             if (role.getName().equals("ROLE_ADMIN")) {
                 mongoService.cleanSavedGameMongodb(daoUserService.findUserById(userId).getUsername());
-                daoMongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "");
-                daoMongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "deskTopSnapShot");
-                daoMongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "deskTopSnapShotBest");
+                mongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "");
+                mongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "deskTopSnapShot");
+                mongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "deskTopSnapShotBest");
                 gameService.deleteGameData(daoUserService.findUserById(userId).getUsername());
                 daoUserService.deleteUser(userId);
                 admin();
@@ -251,11 +251,11 @@ public class TetrisController {
     public void makeSnapShot() {
         JSONObject jsonGameData = new JSONObject(gameService.getGameData(state.getGame().getPlayerName()));
         daoMongoService.makeDesktopSnapshot("deskTopSnapShot", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
-        daoMongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
+        mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
         daoMongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
         if (state.getGame().getPlayerScore() >= jsonGameData.getInt("playerbestscore")) {
             daoMongoService.makeDesktopSnapshot("deskTopSnapShotBest", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
-            daoMongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
+            mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
             daoMongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
         }
         sendFinalStateToBeDisplayed(state);

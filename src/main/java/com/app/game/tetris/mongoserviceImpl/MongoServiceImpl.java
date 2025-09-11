@@ -38,6 +38,6 @@ public class MongoServiceImpl implements MongoService {
 
     @Override
     public void cleanImageMongodb(String playerName, String fileName) {
-        restTemplate.delete("http://mongo-service" + "/deleteimage?playerName={playerName}?fileName={fileName}", playerName, fileName);
+        restTemplate.delete("http://mongo-service" + "/delete_image?playerName={playerName}&fileName={fileName}", playerName, fileName);
     }
 }
