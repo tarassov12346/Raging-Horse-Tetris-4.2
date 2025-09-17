@@ -4,6 +4,7 @@ import com.app.game.tetris.model.SavedGame;
 import com.app.game.tetris.mongoservice.MongoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -39,5 +40,12 @@ public class MongoServiceImpl implements MongoService {
     @Override
     public void cleanImageMongodb(String playerName, String fileName) {
         restTemplate.delete("http://mongo-service" + "/delete_image?playerName={playerName}&fileName={fileName}", playerName, fileName);
+    }
+
+    @Override
+    public byte[] loadByteArrayFromMongodb(String playerName, String fileName) {
+        ResponseEntity<byte[]> response =
+                restTemplate.getForEntity("http://mongo-service" + "/bytes?playerName={playerName}&fileName={fileName}", byte[].class, playerName, fileName);
+        return response.getBody();
     }
 }

@@ -15,4 +15,7 @@ public interface MongoService {
     void prepareMongoDBForNewPLayer(String playerName);
 
     void cleanImageMongodb(String playerName, String fileName);
+
+    byte[] loadByteArrayFromMongodb(String playerName, String fileName);
+
 }

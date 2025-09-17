@@ -110,7 +110,7 @@ public class TetrisController {
     @GetMapping({"/getPhoto"})
     public void getPhoto(HttpServletRequest request,
                          HttpServletResponse response) {
-        byte[] imagenEnBytes = daoMongoService.loadByteArrayFromMongodb(state.getGame().getPlayerName(), "mugShot");
+        byte[] imagenEnBytes = mongoService.loadByteArrayFromMongodb(state.getGame().getPlayerName(), "mugShot");
         response.setHeader("Accept-ranges", "bytes");
         response.setContentType("image/jpeg");
         response.setContentLength(imagenEnBytes.length);
@@ -131,7 +131,7 @@ public class TetrisController {
     @GetMapping({"/getSnapShot"})
     public void getSnapShot(HttpServletRequest request,
                             HttpServletResponse response) {
-        byte[] imagenEnBytes = daoMongoService.loadByteArrayFromMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
+        byte[] imagenEnBytes = mongoService.loadByteArrayFromMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
         response.setHeader("Accept-ranges", "bytes");
         response.setContentType("image/jpeg");
         response.setContentLength(imagenEnBytes.length);
@@ -152,7 +152,7 @@ public class TetrisController {
     @GetMapping({"/getSnapShotBest"})
     public void getSnapShotBest(HttpServletRequest request,
                                 HttpServletResponse response) {
-        byte[] imagenEnBytes = daoMongoService.loadByteArrayFromMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
+        byte[] imagenEnBytes = mongoService.loadByteArrayFromMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
         response.setHeader("Accept-ranges", "bytes");
         response.setContentType("image/jpeg");
         response.setContentLength(imagenEnBytes.length);
