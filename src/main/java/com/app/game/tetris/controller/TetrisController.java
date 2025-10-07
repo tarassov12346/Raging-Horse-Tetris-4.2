@@ -104,7 +104,7 @@ public class TetrisController {
     @MessageMapping("/upload")
     public void upload(String imageBase64Stringsep) {
         mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "");
-        daoMongoService.loadMugShotIntoMongodb(state.getGame().getPlayerName(), Base64.getDecoder().decode(imageBase64Stringsep));
+        mongoService.loadMugShotIntoMongodb(state.getGame().getPlayerName(), Base64.getDecoder().decode(imageBase64Stringsep));
     }
 
     @GetMapping({"/getPhoto"})

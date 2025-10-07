@@ -18,4 +18,5 @@ public interface MongoService {
 
     byte[] loadByteArrayFromMongodb(String playerName, String fileName);
 
+    void loadMugShotIntoMongodb(String playerName, byte[] data);
 }
