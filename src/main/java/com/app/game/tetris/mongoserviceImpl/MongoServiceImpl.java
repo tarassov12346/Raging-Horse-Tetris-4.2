@@ -17,6 +17,8 @@ import java.util.Optional;
 @Service
 public class MongoServiceImpl implements MongoService {
 
+    @Value("${shotsPath}")
+    String shotsPath;
 
     @Autowired
     @LoadBalanced
@@ -57,5 +59,19 @@ public class MongoServiceImpl implements MongoService {
     @Override
     public void loadMugShotIntoMongodb(String playerName, byte[] data) {
         restTemplate.postForObject("http://mongo-service/mugShot?playerName={playerName}", data, byte[].class, playerName);
+    }
+
+    @Override
+    public void loadSnapShotIntoMongodb(String playerName, String fileName) {
+        String pathToShots = System.getProperty("user.dir") + shotsPath;
+        byte[] data = new byte[0];
+        try {
+            data = Files.readAllBytes(Path.of(pathToShots + fileName + ".jpg"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        restTemplate.postForObject("http://mongo-service/snapShot?playerName={playerName}&fileName={fileName}", data, byte[].class, playerName, fileName);
+
+
     }
 }

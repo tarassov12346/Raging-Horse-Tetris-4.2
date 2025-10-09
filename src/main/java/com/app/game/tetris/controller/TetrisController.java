@@ -252,11 +252,13 @@ public class TetrisController {
         JSONObject jsonGameData = new JSONObject(gameService.getGameData(state.getGame().getPlayerName()));
         daoMongoService.makeDesktopSnapshot("deskTopSnapShot", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
         mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
-        daoMongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
+//        daoMongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
+        mongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
         if (state.getGame().getPlayerScore() >= jsonGameData.getInt("playerbestscore")) {
             daoMongoService.makeDesktopSnapshot("deskTopSnapShotBest", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
             mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
-            daoMongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
+//            daoMongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
+            mongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
         }
         sendFinalStateToBeDisplayed(state);
     }
