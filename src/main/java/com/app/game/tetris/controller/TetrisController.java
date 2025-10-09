@@ -1,7 +1,7 @@
 package com.app.game.tetris.controller;
 
-import com.app.game.tetris.daoservice.DaoMongoService;
 import com.app.game.tetris.daoservice.DaoUserService;
+import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Game;
 import com.app.game.tetris.model.Roles;
@@ -10,7 +10,6 @@ import com.app.game.tetris.model.User;
 import com.app.game.tetris.mongoservice.MongoService;
 import com.app.game.tetris.service.PlayGameService;
 import com.app.game.tetris.serviceImpl.State;
-import com.google.gson.Gson;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.json.JSONObject;
@@ -46,7 +45,7 @@ public class TetrisController {
     private DaoUserService daoUserService;
 
     @Autowired
-    private DaoMongoService daoMongoService;
+    private GameArtefactService gameArtefactService;
 
     @Autowired
     private GameService gameService;
@@ -250,11 +249,11 @@ public class TetrisController {
     @MessageMapping("/snapShot")
     public void makeSnapShot() {
         JSONObject jsonGameData = new JSONObject(gameService.getGameData(state.getGame().getPlayerName()));
-        daoMongoService.makeDesktopSnapshot("deskTopSnapShot", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
+        gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
         mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
         mongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
         if (state.getGame().getPlayerScore() >= jsonGameData.getInt("playerbestscore")) {
-            daoMongoService.makeDesktopSnapshot("deskTopSnapShotBest", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
+            gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
             mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
             mongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
         }
