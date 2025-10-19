@@ -1,10 +1,10 @@
-package com.app.game.tetris.daoservice;
+package com.app.game.tetris.userservice;
 
 import com.app.game.tetris.model.User;
 
 import java.util.List;
 
-public interface DaoUserService {
+public interface UserService {
 
     List<User> getAllUsers();
 

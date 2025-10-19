@@ -1,7 +1,7 @@
 package com.app.game.tetris.gameArtefactserviceImpl;
 
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
-import com.app.game.tetris.serviceImpl.State;
+import com.app.game.tetris.tetriserviceImpl.State;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;

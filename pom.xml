@@ -29,9 +29,7 @@
 	</scm>
 	<properties>
 		<java.version>17</java.version>
-
 		<suiteXml>testng-all-tests.xml</suiteXml>
-
 	</properties>
 	<dependencies>
 		<dependency>
@@ -62,16 +60,6 @@
 			<scope>runtime</scope>
 		</dependency>
 
-		<dependency>
-			<groupId>org.mongodb</groupId>
-			<artifactId>mongodb-driver-core</artifactId>
-			<version>4.11.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.mongodb</groupId>
-			<artifactId>mongodb-driver-sync</artifactId>
-			<version>4.11.0</version>
-		</dependency>
 		<dependency>
 			<groupId>com.microsoft.playwright</groupId>
 			<artifactId>playwright</artifactId>
@@ -109,8 +97,6 @@
 			<version>2.0.11</version>
 		</dependency>
 
-
-
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter</artifactId>
@@ -144,11 +130,6 @@
 			<artifactId>json</artifactId>
 			<version>LATEST</version>
 		</dependency>
-
-
-
-
-
 	</dependencies>
 
 
@@ -163,11 +144,6 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
-
-
-
-
-
 
 	<build>
 		<plugins>

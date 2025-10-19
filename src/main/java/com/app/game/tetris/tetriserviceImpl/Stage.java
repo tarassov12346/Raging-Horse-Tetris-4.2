@@ -1,7 +1,7 @@
-package com.app.game.tetris.serviceImpl;
+package com.app.game.tetris.tetriserviceImpl;
 
 import com.app.game.tetris.model.Tetramino;
-import com.app.game.tetris.service.StageService;
+import com.app.game.tetris.tetriservice.StageService;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;

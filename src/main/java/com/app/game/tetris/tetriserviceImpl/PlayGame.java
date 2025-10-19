@@ -1,12 +1,12 @@
-package com.app.game.tetris.serviceImpl;
+package com.app.game.tetris.tetriserviceImpl;
 
 import com.app.game.tetris.model.Game;
 import com.app.game.tetris.model.SavedGame;
 import com.app.game.tetris.model.Tetramino;
-import com.app.game.tetris.service.GameLogic;
-import com.app.game.tetris.service.PlayGameService;
-import com.app.game.tetris.service.StageService;
-import com.app.game.tetris.service.StateService;
+import com.app.game.tetris.tetriservice.GameLogic;
+import com.app.game.tetris.tetriservice.PlayGameService;
+import com.app.game.tetris.tetriservice.StageService;
+import com.app.game.tetris.tetriservice.StateService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

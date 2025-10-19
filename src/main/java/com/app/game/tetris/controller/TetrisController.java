@@ -1,6 +1,6 @@
 package com.app.game.tetris.controller;
 
-import com.app.game.tetris.daoservice.DaoUserService;
+import com.app.game.tetris.userservice.UserService;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Game;
@@ -8,8 +8,8 @@ import com.app.game.tetris.model.Roles;
 import com.app.game.tetris.model.SavedGame;
 import com.app.game.tetris.model.User;
 import com.app.game.tetris.mongoservice.MongoService;
-import com.app.game.tetris.service.PlayGameService;
-import com.app.game.tetris.serviceImpl.State;
+import com.app.game.tetris.tetriservice.PlayGameService;
+import com.app.game.tetris.tetriserviceImpl.State;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.json.JSONObject;
@@ -42,7 +42,7 @@ public class TetrisController {
     private SimpMessagingTemplate template;
 
     @Autowired
-    private DaoUserService daoUserService;
+    private UserService daoUserService;
 
     @Autowired
     private GameArtefactService gameArtefactService;

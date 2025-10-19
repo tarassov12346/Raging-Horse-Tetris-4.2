@@ -1,30 +1,26 @@
 package com.app.game.tetris.model;
 
-import org.bson.codecs.pojo.annotations.BsonCreator;
-import org.bson.codecs.pojo.annotations.BsonProperty;
+
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 
 @Component
 public class SavedGame {
-    @BsonProperty("playerName")
+
+    public SavedGame() {
+    }
+
     private String playerName;
 
-    @BsonProperty("playerScore")
     private int playerScore;
 
-    @BsonProperty("cells")
     private char[][] cells;
 
-    @BsonCreator
-    private SavedGame(@BsonProperty("playerName") String playerName, @BsonProperty("playerScore") int playerScore, @BsonProperty("cells") char[][] cells) {
+    private SavedGame( String playerName,  int playerScore,  char[][] cells) {
         this.playerName = playerName;
         this.playerScore = playerScore;
         this.cells = cells;
-    }
-
-    private SavedGame() {
     }
 
     public SavedGame buildSavedGame(String playerName, int playerScore, char[][] cells) {

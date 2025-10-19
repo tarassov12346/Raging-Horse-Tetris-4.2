@@ -1,4 +1,4 @@
-package com.app.game.tetris.service;
+package com.app.game.tetris.tetriservice;
 
 import com.app.game.tetris.model.Tetramino;
 

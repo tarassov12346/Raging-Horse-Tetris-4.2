@@ -1,6 +1,6 @@
-package com.app.game.tetris.daoserviceImpl;
+package com.app.game.tetris.userserviceImpl;
 
-import com.app.game.tetris.daoservice.DaoUserService;
+import com.app.game.tetris.userservice.UserService;
 import com.app.game.tetris.model.Roles;
 import com.app.game.tetris.model.User;
 import com.app.game.tetris.repository.RoleRepository;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Data
-public class DaoUser implements UserDetailsService, DaoUserService {
+public class UserServiceImpl implements UserDetailsService, UserService {
     @Autowired
     UserRepository userRepository;
 
