@@ -1,5 +1,6 @@
 package com.app.game.tetris.controller;
 
+import com.app.game.tetris.displayservice.DisplayService;
 import com.app.game.tetris.userservice.UserService;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
@@ -34,10 +35,6 @@ public class TetrisController {
     @Autowired
     private PlayGameService playGameService;
 
- //   private State state;
-
-    private ScheduledExecutorService service;
-
     @Autowired
     private SimpMessagingTemplate template;
 
@@ -52,6 +49,11 @@ public class TetrisController {
 
     @Autowired
     private MongoService mongoService;
+
+    @Autowired
+    DisplayService displayService;
+
+    private ScheduledExecutorService service;
 
     @MessageMapping("/register")
     public void register(User user) {
@@ -84,17 +86,11 @@ public class TetrisController {
 
     @MessageMapping("/hello")
     public void hello(Principal principal) {
-   //     state = playGameService.initiateState(principal.getName());
-
         playGameService.setState(playGameService.initiateState(principal.getName()));
-        //state=(State) playGameService.getState();
-
-
-
         mongoService.prepareMongoDBForNewPLayer(playGameService.getState().getGame().getPlayerName());
-        sendGameToBeDisplayed(playGameService.getState().getGame());
+        displayService.sendGameToBeDisplayed(playGameService.getState().getGame(), template);
         JSONObject jsonGameData = new JSONObject(gameService.getGameData(principal.getName()));
-        sendDaoGameToBeDisplayed(playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")));
+        displayService.sendDaoGameToBeDisplayed(playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")), template);
     }
 
     @MessageMapping("/profile")
@@ -212,27 +208,26 @@ public class TetrisController {
         switch (moveId) {
             case "start" -> {
                 JSONObject jsonGameData = new JSONObject(gameService.getGameData(playGameService.getState().getGame().getPlayerName()));
-                sendDaoGameToBeDisplayed(playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")));
+                displayService.sendDaoGameToBeDisplayed(playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")), template);
                 service = Executors.newScheduledThreadPool(1);
                 playGameService.setState(playGameService.getState());
-                service.scheduleAtFixedRate(() -> sendStateToBeDisplayed(), 0, 1000, TimeUnit.MILLISECONDS);
+                service.scheduleAtFixedRate(() -> displayService.sendStateToBeDisplayed(playGameService, gameService, service, template), 0, 1000, TimeUnit.MILLISECONDS);
             }
             case "1" -> {
-
                 playGameService.setState(playGameService.rotateState((State) playGameService.getState()));
-                sendStateToBeDisplayed();
+                displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
             }
             case "2" -> {
                 playGameService.setState(playGameService.moveLeftState((State) playGameService.getState()));
-                sendStateToBeDisplayed();
+                displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
             }
             case "3" -> {
                 playGameService.setState(playGameService.moveRightState((State) playGameService.getState()));
-                sendStateToBeDisplayed();
+                displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
             }
             case "4" -> {
                 playGameService.setState(playGameService.dropDownState((State) playGameService.getState()));
-                sendStateToBeDisplayed();
+                displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
             }
         }
     }
@@ -242,17 +237,15 @@ public class TetrisController {
         service.shutdown();
         SavedGame savedGame = playGameService.saveGame(playGameService.getState().getGame(), (State) playGameService.getState());
         mongoService.saveGame(savedGame);
-        sendSavedStateToBeDisplayed((State) playGameService.getState());
+        displayService.sendSavedStateToBeDisplayed(playGameService, gameService, service, template);
     }
 
     @MessageMapping("/restart")
     public void gameRestart() {
         if (mongoService.gameRestart(playGameService.getState().getGame().getPlayerName()).isPresent()) {
             SavedGame savedGame = mongoService.gameRestart(playGameService.getState().getGame().getPlayerName()).get();
-          //  state = playGameService.recreateStateFromSavedGame(savedGame);
             playGameService.setState(playGameService.recreateStateFromSavedGame(savedGame));
-            sendStateToBeDisplayed();
-           // state = sendStateToBeDisplayed(state);
+            displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
         }
     }
 
@@ -267,57 +260,7 @@ public class TetrisController {
             mongoService.cleanImageMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShotBest");
             mongoService.loadSnapShotIntoMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShotBest");
         }
-        sendFinalStateToBeDisplayed((State) playGameService.getState());
-    }
-
-    private void sendStateToBeDisplayed() {
-     //   state = createStateAfterMoveDown(state);
-
-        playGameService.setState(createStateAfterMoveDown((State) playGameService.getState()));
-
-        char[][] cellsToBeDisplayed = playGameService.getState().getStage().drawTetraminoOnCells();
-        State stateToBeSent = playGameService.getState().buildState(playGameService.getState().getStage().buildStage(cellsToBeDisplayed), playGameService.getState().isRunning(), playGameService.getState().getGame());
-        this.template.convertAndSend("/receive/stateObjects", stateToBeSent);
-       // return state;
-    }
-
-    private State sendFinalStateToBeDisplayed(State state) {
-        state = createStateAfterMoveDown(state);
-        char[][] cellsToBeDisplayed = state.getStage().drawTetraminoOnCells();
-        State stateToBeSent = state.buildState(state.getStage().buildStage(cellsToBeDisplayed), state.isRunning(), state.getGame());
-        this.template.convertAndSend("/receive/stateFinal", stateToBeSent);
-        return state;
-    }
-
-    private State sendSavedStateToBeDisplayed(State state) {
-        state = createStateAfterMoveDown(state);
-        char[][] cellsToBeDisplayed = state.getStage().drawTetraminoOnCells();
-        State stateToBeSent = state.buildState(state.getStage().buildStage(cellsToBeDisplayed), state.isRunning(), state.getGame());
-        this.template.convertAndSend("/receive/stateSaved", stateToBeSent);
-        return state;
-    }
-
-    private void sendDaoGameToBeDisplayed(Game game) {
-        this.template.convertAndSend("/receive/daoGameObjects", game);
-    }
-
-    private void sendGameToBeDisplayed(Game game) {
-        this.template.convertAndSend("/receive/gameObjects", game);
-    }
-
-    private State createStateAfterMoveDown(State state) {
-        Optional<State> moveDownState = playGameService.moveDownState(state);
-        if (moveDownState.isEmpty()) {
-            Optional<State> newTetraminoState = playGameService.newTetraminoState(state);
-            if (newTetraminoState.isEmpty()) {
-                state = state.stop();
-                if (!service.isShutdown()) gameService.doRecord(state.getGame());
-                service.shutdown();
-                return state;
-            } else state = newTetraminoState.orElse(state);
-        }
-        state = moveDownState.orElse(state);
-        return state;
+        displayService.sendFinalStateToBeDisplayed(playGameService, gameService, service, template);
     }
 
     private Set<Game> getAllBestResults(List<Game> playersList) {
