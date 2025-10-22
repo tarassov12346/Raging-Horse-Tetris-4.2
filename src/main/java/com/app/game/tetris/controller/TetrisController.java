@@ -34,7 +34,7 @@ public class TetrisController {
     @Autowired
     private PlayGameService playGameService;
 
-    private State state;
+ //   private State state;
 
     private ScheduledExecutorService service;
 
@@ -84,32 +84,38 @@ public class TetrisController {
 
     @MessageMapping("/hello")
     public void hello(Principal principal) {
-        state = playGameService.initiateState(principal.getName());
-        mongoService.prepareMongoDBForNewPLayer(state.getGame().getPlayerName());
-        sendGameToBeDisplayed(state.getGame());
+   //     state = playGameService.initiateState(principal.getName());
+
+        playGameService.setState(playGameService.initiateState(principal.getName()));
+        //state=(State) playGameService.getState();
+
+
+
+        mongoService.prepareMongoDBForNewPLayer(playGameService.getState().getGame().getPlayerName());
+        sendGameToBeDisplayed(playGameService.getState().getGame());
         JSONObject jsonGameData = new JSONObject(gameService.getGameData(principal.getName()));
         sendDaoGameToBeDisplayed(playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")));
     }
 
     @MessageMapping("/profile")
     public void profile() {
-        JSONObject jsonGameData = new JSONObject(gameService.getGameData(state.getGame().getPlayerName()));
+        JSONObject jsonGameData = new JSONObject(gameService.getGameData(playGameService.getState().getGame().getPlayerName()));
         this.template.convertAndSend("/receive/playerStat",
-                playGameService.createGame(state.getGame().getPlayerName(), jsonGameData.getInt("playerbestscore")));
+                playGameService.createGame(playGameService.getState().getGame().getPlayerName(), jsonGameData.getInt("playerbestscore")));
         this.template.convertAndSend("/receive/playerAttemptsNumber",
                 playGameService.createGame("DataTransferObject", jsonGameData.getInt("playerAttemptsNumber")));
     }
 
     @MessageMapping("/upload")
     public void upload(String imageBase64Stringsep) {
-        mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "");
-        mongoService.loadMugShotIntoMongodb(state.getGame().getPlayerName(), Base64.getDecoder().decode(imageBase64Stringsep));
+        mongoService.cleanImageMongodb(playGameService.getState().getGame().getPlayerName(), "");
+        mongoService.loadMugShotIntoMongodb(playGameService.getState().getGame().getPlayerName(), Base64.getDecoder().decode(imageBase64Stringsep));
     }
 
     @GetMapping({"/getPhoto"})
     public void getPhoto(HttpServletRequest request,
                          HttpServletResponse response) {
-        byte[] imagenEnBytes = mongoService.loadByteArrayFromMongodb(state.getGame().getPlayerName(), "mugShot");
+        byte[] imagenEnBytes = mongoService.loadByteArrayFromMongodb(playGameService.getState().getGame().getPlayerName(), "mugShot");
         response.setHeader("Accept-ranges", "bytes");
         response.setContentType("image/jpeg");
         response.setContentLength(imagenEnBytes.length);
@@ -130,7 +136,7 @@ public class TetrisController {
     @GetMapping({"/getSnapShot"})
     public void getSnapShot(HttpServletRequest request,
                             HttpServletResponse response) {
-        byte[] imagenEnBytes = mongoService.loadByteArrayFromMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
+        byte[] imagenEnBytes = mongoService.loadByteArrayFromMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShot");
         response.setHeader("Accept-ranges", "bytes");
         response.setContentType("image/jpeg");
         response.setContentLength(imagenEnBytes.length);
@@ -151,7 +157,7 @@ public class TetrisController {
     @GetMapping({"/getSnapShotBest"})
     public void getSnapShotBest(HttpServletRequest request,
                                 HttpServletResponse response) {
-        byte[] imagenEnBytes = mongoService.loadByteArrayFromMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
+        byte[] imagenEnBytes = mongoService.loadByteArrayFromMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShotBest");
         response.setHeader("Accept-ranges", "bytes");
         response.setContentType("image/jpeg");
         response.setContentLength(imagenEnBytes.length);
@@ -182,11 +188,11 @@ public class TetrisController {
 
     @MessageMapping("/admin/{userId}")
     public void deleteUser(@DestinationVariable Long userId) {
-        if (daoUserService.findUserById(userId).getUsername().equals(state.getGame().getPlayerName())) {
+        if (daoUserService.findUserById(userId).getUsername().equals(playGameService.getState().getGame().getPlayerName())) {
             this.template.convertAndSend("/receive/alert", "You cannot delete yourself!");
             return;
         }
-        for (Roles role : daoUserService.findUserByUserName(state.getGame().getPlayerName()).getRoles()) {
+        for (Roles role : daoUserService.findUserByUserName(playGameService.getState().getGame().getPlayerName()).getRoles()) {
             if (role.getName().equals("ROLE_ADMIN")) {
                 mongoService.cleanSavedGameMongodb(daoUserService.findUserById(userId).getUsername());
                 mongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "");
@@ -205,26 +211,28 @@ public class TetrisController {
     public void gamePlayDown(@DestinationVariable String moveId) {
         switch (moveId) {
             case "start" -> {
-                JSONObject jsonGameData = new JSONObject(gameService.getGameData(state.getGame().getPlayerName()));
+                JSONObject jsonGameData = new JSONObject(gameService.getGameData(playGameService.getState().getGame().getPlayerName()));
                 sendDaoGameToBeDisplayed(playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")));
                 service = Executors.newScheduledThreadPool(1);
-                service.scheduleAtFixedRate(() -> state = sendStateToBeDisplayed(state), 0, 1000, TimeUnit.MILLISECONDS);
+                playGameService.setState(playGameService.getState());
+                service.scheduleAtFixedRate(() -> sendStateToBeDisplayed(), 0, 1000, TimeUnit.MILLISECONDS);
             }
             case "1" -> {
-                state = playGameService.rotateState(state);
-                state = sendStateToBeDisplayed(state);
+
+                playGameService.setState(playGameService.rotateState((State) playGameService.getState()));
+                sendStateToBeDisplayed();
             }
             case "2" -> {
-                state = playGameService.moveLeftState(state);
-                state = sendStateToBeDisplayed(state);
+                playGameService.setState(playGameService.moveLeftState((State) playGameService.getState()));
+                sendStateToBeDisplayed();
             }
             case "3" -> {
-                state = playGameService.moveRightState(state);
-                state = sendStateToBeDisplayed(state);
+                playGameService.setState(playGameService.moveRightState((State) playGameService.getState()));
+                sendStateToBeDisplayed();
             }
             case "4" -> {
-                state = playGameService.dropDownState(state);
-                state = sendStateToBeDisplayed(state);
+                playGameService.setState(playGameService.dropDownState((State) playGameService.getState()));
+                sendStateToBeDisplayed();
             }
         }
     }
@@ -232,40 +240,45 @@ public class TetrisController {
     @MessageMapping("/save")
     public void gameSave() {
         service.shutdown();
-        SavedGame savedGame = playGameService.saveGame(state.getGame(), state);
+        SavedGame savedGame = playGameService.saveGame(playGameService.getState().getGame(), (State) playGameService.getState());
         mongoService.saveGame(savedGame);
-        sendSavedStateToBeDisplayed(state);
+        sendSavedStateToBeDisplayed((State) playGameService.getState());
     }
 
     @MessageMapping("/restart")
     public void gameRestart() {
-        if (mongoService.gameRestart(state.getGame().getPlayerName()).isPresent()) {
-            SavedGame savedGame = mongoService.gameRestart(state.getGame().getPlayerName()).get();
-            state = playGameService.recreateStateFromSavedGame(savedGame);
-            state = sendStateToBeDisplayed(state);
+        if (mongoService.gameRestart(playGameService.getState().getGame().getPlayerName()).isPresent()) {
+            SavedGame savedGame = mongoService.gameRestart(playGameService.getState().getGame().getPlayerName()).get();
+          //  state = playGameService.recreateStateFromSavedGame(savedGame);
+            playGameService.setState(playGameService.recreateStateFromSavedGame(savedGame));
+            sendStateToBeDisplayed();
+           // state = sendStateToBeDisplayed(state);
         }
     }
 
     @MessageMapping("/snapShot")
     public void makeSnapShot() {
-        JSONObject jsonGameData = new JSONObject(gameService.getGameData(state.getGame().getPlayerName()));
-        gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
-        mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
-        mongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShot");
-        if (state.getGame().getPlayerScore() >= jsonGameData.getInt("playerbestscore")) {
-            gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", state, jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
-            mongoService.cleanImageMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
-            mongoService.loadSnapShotIntoMongodb(state.getGame().getPlayerName(), "deskTopSnapShotBest");
+        JSONObject jsonGameData = new JSONObject(gameService.getGameData(playGameService.getState().getGame().getPlayerName()));
+        gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", (State) playGameService.getState(), jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
+        mongoService.cleanImageMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShot");
+        mongoService.loadSnapShotIntoMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShot");
+        if (playGameService.getState().getGame().getPlayerScore() >= jsonGameData.getInt("playerbestscore")) {
+            gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", (State) playGameService.getState(), jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
+            mongoService.cleanImageMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShotBest");
+            mongoService.loadSnapShotIntoMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShotBest");
         }
-        sendFinalStateToBeDisplayed(state);
+        sendFinalStateToBeDisplayed((State) playGameService.getState());
     }
 
-    private State sendStateToBeDisplayed(State state) {
-        state = createStateAfterMoveDown(state);
-        char[][] cellsToBeDisplayed = state.getStage().drawTetraminoOnCells();
-        State stateToBeSent = state.buildState(state.getStage().buildStage(cellsToBeDisplayed), state.isRunning(), state.getGame());
+    private void sendStateToBeDisplayed() {
+     //   state = createStateAfterMoveDown(state);
+
+        playGameService.setState(createStateAfterMoveDown((State) playGameService.getState()));
+
+        char[][] cellsToBeDisplayed = playGameService.getState().getStage().drawTetraminoOnCells();
+        State stateToBeSent = playGameService.getState().buildState(playGameService.getState().getStage().buildStage(cellsToBeDisplayed), playGameService.getState().isRunning(), playGameService.getState().getGame());
         this.template.convertAndSend("/receive/stateObjects", stateToBeSent);
-        return state;
+       // return state;
     }
 
     private State sendFinalStateToBeDisplayed(State state) {

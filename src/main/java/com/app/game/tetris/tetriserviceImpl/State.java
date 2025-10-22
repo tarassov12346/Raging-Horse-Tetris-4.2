@@ -29,6 +29,7 @@ public class State implements StateService {
     private State() {
     }
 
+    @Override
     public boolean isRunning() {
         return isRunning;
     }
@@ -65,10 +66,12 @@ public class State implements StateService {
         return !checkCollision(0, 1, false) ? Optional.of(moveTetraminoDown(yToStepDown - 1)) : Optional.empty();
     }
 
+    @Override
     public void setGame(Game game) {
         this.game = game;
     }
 
+    @Override
     public Game getGame() {
         return game;
     }

@@ -8,6 +8,13 @@ import java.util.Optional;
 
 public interface StateService extends GameLogic<Optional<State>>{
     State buildState(Stage stage, boolean isRunning, Game game);
+
+    boolean isRunning();
+
+    void setGame(Game game);
+
+    Game getGame();
+
     State start();
     State stop();
     Optional<State> createStateWithNewTetramino();

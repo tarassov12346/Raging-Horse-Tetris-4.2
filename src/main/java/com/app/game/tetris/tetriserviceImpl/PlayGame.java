@@ -22,6 +22,16 @@ public class PlayGame implements PlayGameService {
     @Autowired
     private StageService stage;
 
+    @Override
+    public void setState(StateService state) {
+        this.state = state;
+    }
+
+    @Override
+    public StateService getState() {
+        return state;
+    }
+
     @Autowired
     private StateService state;
 
@@ -37,36 +47,57 @@ public class PlayGame implements PlayGameService {
     }
 
     @Override
-    public State initiateState(String playerName) {
+    public StateService initiateState(String playerName) {
         Stage emptyStage = stage.buildStage(makeEmptyMatrix(), getTetramino0(), 0, 0, 0);
         State initialState = state.buildState(emptyStage, false, createGame(playerName,0));
-        return initialState.start().createStateWithNewTetramino().orElse(initialState);
+
+        state=initialState.start().createStateWithNewTetramino().orElse(initialState);
+
+        return state;
+
+
     }
 
     @Override
-    public State dropDownState(State state) {return state.dropDown().orElse(state);
+    public StateService dropDownState(State state) {
+        this.state=state.dropDown().orElse(state);
+
+        return this.state;
+
     }
 
     @Override
-    public State moveRightState(State state) {
-        return state.moveRight().orElse(state);
+    public StateService moveRightState(State state) {
+        this.state=state.moveRight().orElse(state);
+
+        return this.state;
+
     }
 
     @Override
-    public State moveLeftState(State state) {
-        return state.moveLeft().orElse(state);
+    public StateService moveLeftState(State state) {
+        this.state=state.moveLeft().orElse(state);
+
+        return this.state;
+
     }
 
     @Override
-    public State rotateState(State state) {
-        return state.rotate().orElse(state);
+    public StateService rotateState(State state) {
+        this.state=state.rotate().orElse(state);
+
+        return this.state;
+
     }
 
     @Override
-    public Optional<State> moveDownState(State state) {return state.moveDown(state.getStepDown());}
+    public Optional<State> moveDownState(State state) {
+  //      this.state=state.moveDown(state.getStepDown()).orElse(state);
+        return state.moveDown(state.getStepDown());}
 
     @Override
     public Optional<State> newTetraminoState(State state) {
+  //      this.state=state.createStateWithNewTetramino().orElse(state);
         return state.createStateWithNewTetramino();
     }
 
@@ -79,6 +110,7 @@ public class PlayGame implements PlayGameService {
     public State recreateStateFromSavedGame(SavedGame savedGame) {
         Game recreatedGame = game.buildGame(savedGame.getPlayerName(), savedGame.getPlayerScore());
         Stage recreatedStage = stage.buildStage(savedGame.getCells(), getTetramino0(), 0, 0, recreatedGame.getPlayerScore() / 10);
+        state=state.buildState(recreatedStage, true, recreatedGame).restartWithNewTetramino().orElse(state.buildState(recreatedStage, true, recreatedGame));
         return state.buildState(recreatedStage, true, recreatedGame).restartWithNewTetramino().orElse(state.buildState(recreatedStage, true, recreatedGame));
     }
 
