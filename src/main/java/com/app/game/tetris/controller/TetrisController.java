@@ -1,6 +1,7 @@
 package com.app.game.tetris.controller;
 
 import com.app.game.tetris.displayservice.DisplayService;
+import com.app.game.tetris.users_service.UsersService;
 import com.app.game.tetris.userservice.UserService;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
@@ -42,6 +43,10 @@ public class TetrisController {
     private UserService daoUserService;
 
     @Autowired
+    private UsersService usersService;
+
+
+    @Autowired
     private GameArtefactService gameArtefactService;
 
     @Autowired
@@ -77,7 +82,7 @@ public class TetrisController {
         } else {
             this.template.convertAndSend("/receive/message", "The password is not confirmed!");
         }
-        if (!daoUserService.saveUser(newUser)) {
+        if (!usersService.saveUser(newUser)) {
             this.template.convertAndSend("/receive/message", "This user already exists!");
         } else {
             this.template.convertAndSend("/receive/message", "The user " + newUser.getUsername() + " has been successfully registered!");
@@ -184,18 +189,19 @@ public class TetrisController {
 
     @MessageMapping("/admin/{userId}")
     public void deleteUser(@DestinationVariable Long userId) {
-        if (daoUserService.findUserById(userId).getUsername().equals(playGameService.getState().getGame().getPlayerName())) {
+        User foundByIdUser=usersService.findUserById(userId);
+        if (foundByIdUser.getUsername().equals(playGameService.getState().getGame().getPlayerName())) {
             this.template.convertAndSend("/receive/alert", "You cannot delete yourself!");
             return;
         }
         for (Roles role : daoUserService.findUserByUserName(playGameService.getState().getGame().getPlayerName()).getRoles()) {
             if (role.getName().equals("ROLE_ADMIN")) {
-                mongoService.cleanSavedGameMongodb(daoUserService.findUserById(userId).getUsername());
-                mongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "");
-                mongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "deskTopSnapShot");
-                mongoService.cleanImageMongodb(daoUserService.findUserById(userId).getUsername(), "deskTopSnapShotBest");
-                gameService.deleteGameData(daoUserService.findUserById(userId).getUsername());
-                daoUserService.deleteUser(userId);
+                mongoService.cleanSavedGameMongodb(foundByIdUser.getUsername());
+                mongoService.cleanImageMongodb(foundByIdUser.getUsername(), "");
+                mongoService.cleanImageMongodb(foundByIdUser.getUsername(), "deskTopSnapShot");
+                mongoService.cleanImageMongodb(foundByIdUser.getUsername(), "deskTopSnapShotBest");
+                gameService.deleteGameData(foundByIdUser.getUsername());
+                usersService.deleteUser(userId);
                 admin();
                 return;
             }
