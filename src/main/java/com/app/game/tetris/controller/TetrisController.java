@@ -39,8 +39,8 @@ public class TetrisController {
     @Autowired
     private SimpMessagingTemplate template;
 
-    @Autowired
-    private UserService daoUserService;
+ //   @Autowired
+ //   private UserService daoUserService;
 
     @Autowired
     private UsersService usersService;
@@ -62,9 +62,9 @@ public class TetrisController {
 
     @MessageMapping("/register")
     public void register(User user) {
-        if (daoUserService.isRolesDBEmpty()) {
-            daoUserService.prepareRolesDB();
-            daoUserService.prepareUserDB();
+        if (usersService.isRolesDBEmpty()) {
+            usersService.prepareRolesDB();
+            usersService.prepareUserDB();
         }
         User newUser = new User();
         if (!user.getUsername().matches(".*[a-zA-Z]+.*")) {
@@ -178,7 +178,7 @@ public class TetrisController {
 
     @MessageMapping("/admin")
     public void admin() {
-        List<User> allUsersList = daoUserService.getAllUsers();
+        List<User> allUsersList = usersService.getAllUsers();
         allUsersList.forEach(user -> this.template.convertAndSend("/receive/users",
                 new User(user.getId(), user.getUsername(), user.getPassword(),
                         String.join(";", user.getRoles().stream().map(Roles::getName).collect(Collectors.toList())),
@@ -194,7 +194,7 @@ public class TetrisController {
             this.template.convertAndSend("/receive/alert", "You cannot delete yourself!");
             return;
         }
-        for (Roles role : daoUserService.findUserByUserName(playGameService.getState().getGame().getPlayerName()).getRoles()) {
+        for (Roles role : usersService.findUserByUserName(playGameService.getState().getGame().getPlayerName()).getRoles()) {
             if (role.getName().equals("ROLE_ADMIN")) {
                 mongoService.cleanSavedGameMongodb(foundByIdUser.getUsername());
                 mongoService.cleanImageMongodb(foundByIdUser.getUsername(), "");
