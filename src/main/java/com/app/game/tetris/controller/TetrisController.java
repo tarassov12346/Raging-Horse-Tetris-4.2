@@ -2,7 +2,6 @@ package com.app.game.tetris.controller;
 
 import com.app.game.tetris.displayservice.DisplayService;
 import com.app.game.tetris.users_service.UsersService;
-import com.app.game.tetris.userservice.UserService;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Game;
@@ -38,9 +37,6 @@ public class TetrisController {
 
     @Autowired
     private SimpMessagingTemplate template;
-
- //   @Autowired
- //   private UserService daoUserService;
 
     @Autowired
     private UsersService usersService;
