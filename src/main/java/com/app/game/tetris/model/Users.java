@@ -14,7 +14,7 @@ import java.util.Set;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "t_user")
-public class User {
+public class Users {
     public void setId(Long id) {
         this.id = id;
     }

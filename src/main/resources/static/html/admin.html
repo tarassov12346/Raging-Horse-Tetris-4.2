@@ -32,7 +32,7 @@
               text-align: center;
          }
 
-          #user{text-align: center;}
+          #users{text-align: center;}
           #users{margin-left: auto;
           margin-right: auto;}
           #results{margin-left: auto;
@@ -70,8 +70,8 @@
             setConnected(true);
             console.log('Connected: ' + frame);
 
-            stompClient.subscribe('/receive/users', function (user) {
-                showUsers(user.body);
+            stompClient.subscribe('/receive/users', function (users) {
+                showUsers(users.body);
             });
 
         }
@@ -123,8 +123,8 @@
            audio.play();
        }
 
-       function showUsers(user) {
-          var jsonUser = JSON.parse(user);
+       function showUsers(users) {
+          var jsonUser = JSON.parse(users);
         $("#users").prepend("<tr>" +
         "<td>" + jsonUser['id'] + "</td>" +
         "<td>" + jsonUser['username'] + "</td>" +
@@ -180,7 +180,7 @@
 <body>
 
 
-<div id="user">
+<div id="users">
     <h1>ALL REGISTERED USERS</h1>
     <table class="table table-striped" id="users">
         <thead>

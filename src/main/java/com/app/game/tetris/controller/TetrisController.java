@@ -1,13 +1,13 @@
 package com.app.game.tetris.controller;
 
 import com.app.game.tetris.displayservice.DisplayService;
+import com.app.game.tetris.model.Users;
 import com.app.game.tetris.users_service.UsersService;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Game;
 import com.app.game.tetris.model.Roles;
 import com.app.game.tetris.model.SavedGame;
-import com.app.game.tetris.model.User;
 import com.app.game.tetris.mongoservice.MongoService;
 import com.app.game.tetris.tetriservice.PlayGameService;
 import com.app.game.tetris.tetriserviceImpl.State;
@@ -57,12 +57,12 @@ public class TetrisController {
     private ScheduledExecutorService service;
 
     @MessageMapping("/register")
-    public void register(User user) {
+    public void register(Users user) {
         if (usersService.isRolesDBEmpty()) {
             usersService.prepareRolesDB();
             usersService.prepareUserDB();
         }
-        User newUser = new User();
+        Users newUser = new Users();
         if (!user.getUsername().matches(".*[a-zA-Z]+.*")) {
             this.template.convertAndSend("/receive/message", "The user name should contain at least one letter!");
             return;
@@ -174,9 +174,9 @@ public class TetrisController {
 
     @MessageMapping("/admin")
     public void admin() {
-        List<User> allUsersList = usersService.getAllUsers();
+        List<Users> allUsersList = usersService.getAllUsers();
         allUsersList.forEach(user -> this.template.convertAndSend("/receive/users",
-                new User(user.getId(), user.getUsername(), user.getPassword(),
+                new Users(user.getId(), user.getUsername(), user.getPassword(),
                         String.join(";", user.getRoles().stream().map(Roles::getName).collect(Collectors.toList())),
                         user.getRoles())));
         getAllBestResults(gameService.getAllGames()).
@@ -185,7 +185,7 @@ public class TetrisController {
 
     @MessageMapping("/admin/{userId}")
     public void deleteUser(@DestinationVariable Long userId) {
-        User foundByIdUser=usersService.findUserById(userId);
+        Users foundByIdUser =usersService.findUserById(userId);
         if (foundByIdUser.getUsername().equals(playGameService.getState().getGame().getPlayerName())) {
             this.template.convertAndSend("/receive/alert", "You cannot delete yourself!");
             return;
