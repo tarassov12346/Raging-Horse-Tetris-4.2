@@ -1,15 +1,15 @@
 package com.app.game.tetris.model;
 
-import jakarta.persistence.*;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Entity
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "t_role")
+
 public class Roles {
     public long getId() {
         return id;
@@ -27,8 +27,7 @@ public class Roles {
         return name;
     }
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+
     private long id;
 
     private String name;

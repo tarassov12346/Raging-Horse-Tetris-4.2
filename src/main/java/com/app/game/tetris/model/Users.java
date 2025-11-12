@@ -2,18 +2,18 @@ package com.app.game.tetris.model;
 
 //admin password:sam; user password:mas; Dunny dun; Oswaldo osw; Tommy tom; Bonny bon; Ira ira; Wolfy wol;
 
-import jakarta.persistence.*;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.Set;
 
-@Entity
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "t_user")
+
 public class Users {
     public void setId(Long id) {
         this.id = id;
@@ -35,9 +35,7 @@ public class Users {
         this.roles = roles;
     }
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", unique = true, nullable = false, insertable = false, updatable = false)
+
     private Long id;
 
     public Long getId() {
@@ -60,19 +58,15 @@ public class Users {
         return roles;
     }
 
-    @Column(nullable = false, unique = true)
+
     private String username;
 
-    @Column(nullable = false, unique = true)
+
     private String password;
 
-    @Transient
+
     private String passwordConfirm;
 
-    @ManyToMany(fetch = FetchType.EAGER, cascade =  {CascadeType.MERGE, CascadeType.DETACH})
-    @JoinTable(name = "t_user_roles",
-            joinColumns = @JoinColumn(name = "user_id", referencedColumnName = "id"),
-            inverseJoinColumns = @JoinColumn(name = "roles_id", referencedColumnName = "id")
-    )
+
     private Set<Roles> roles;
 }
