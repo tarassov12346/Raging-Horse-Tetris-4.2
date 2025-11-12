@@ -13,6 +13,5 @@ public interface StageService extends GameLogic<Stage>{
     int getTetraminoY();
     int getCollapsedLayersCount();
     void setCells(char[][] cells);
-
     Stage setTetramino(Tetramino tetramino, int x, int y);
 }

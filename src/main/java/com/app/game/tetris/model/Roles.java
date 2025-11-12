@@ -9,8 +9,11 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-
 public class Roles {
+    private long id;
+
+    private String name;
+
     public long getId() {
         return id;
     }
@@ -26,9 +29,4 @@ public class Roles {
     public String getName() {
         return name;
     }
-
-
-    private long id;
-
-    private String name;
 }

@@ -2,14 +2,11 @@ package com.app.game.tetris.model;
 
 import lombok.Data;
 import org.springframework.stereotype.Component;
-
 import java.util.Objects;
 
 @Component
 @Data
-
 public class Game {
-
     private Long id;
 
     private String playerName;
@@ -31,7 +28,6 @@ public class Game {
     public Game buildGame(String playerName, int playerScore){
         return new Game(playerName, playerScore);
     }
-
 
     public String getPlayerName() {
         return playerName;

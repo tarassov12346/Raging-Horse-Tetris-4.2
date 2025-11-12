@@ -1,16 +1,10 @@
 package com.app.game.tetris.model;
 
-
 import org.springframework.stereotype.Component;
-
 import java.util.Arrays;
 
 @Component
 public class SavedGame {
-
-    public SavedGame() {
-    }
-
     private String playerName;
 
     private int playerScore;
@@ -21,6 +15,9 @@ public class SavedGame {
         this.playerName = playerName;
         this.playerScore = playerScore;
         this.cells = cells;
+    }
+
+    public SavedGame() {
     }
 
     public SavedGame buildSavedGame(String playerName, int playerScore, char[][] cells) {

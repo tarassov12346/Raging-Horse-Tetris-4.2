@@ -59,18 +59,18 @@ public class UsersServiceImpl implements UsersService, UserDetailsService {
 
     @Override
     public void prepareRolesDB() {
-        restTemplate.getForObject("http://users-service/prepareRolesDB",Void.class);
+        restTemplate.getForObject("http://users-service/prepareRolesDB", Void.class);
     }
 
     @Override
     public void prepareUserDB() {
-        restTemplate.getForObject("http://users-service/prepareUserDB",Void.class);
+        restTemplate.getForObject("http://users-service/prepareUserDB", Void.class);
     }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
-        Users user =restTemplate.getForObject("http://users-service" + "/findName?userName={userName}", Users.class, username);
+        Users user = restTemplate.getForObject("http://users-service" + "/findName?userName={userName}", Users.class, username);
 
         List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role))  // Префикс ROLE_ если нужно
@@ -81,7 +81,5 @@ public class UsersServiceImpl implements UsersService, UserDetailsService {
                 user.getPassword(),
                 authorities  // Или пустой список, если authorities не нужны сразу
         );
-
-
     }
 }

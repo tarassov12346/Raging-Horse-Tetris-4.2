@@ -14,7 +14,6 @@ public class State implements StateService {
     private boolean isRunning;
     private Game game;
 
-
     private State(Stage stage, boolean isRunning, Game game) {
         this.stage = Objects.requireNonNull(stage);
         this.isRunning = isRunning;

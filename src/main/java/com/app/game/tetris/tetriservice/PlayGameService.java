@@ -9,8 +9,6 @@ import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 
 public interface PlayGameService {
-
-
     void setState(StateService state);
 
     StateService getState();

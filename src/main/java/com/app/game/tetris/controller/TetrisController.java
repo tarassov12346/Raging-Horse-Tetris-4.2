@@ -41,7 +41,6 @@ public class TetrisController {
     @Autowired
     private UsersService usersService;
 
-
     @Autowired
     private GameArtefactService gameArtefactService;
 

@@ -17,7 +17,6 @@ import java.util.stream.IntStream;
 
 @Service
 public class PlayGame implements PlayGameService {
-
     @Autowired
     private Game game;
 

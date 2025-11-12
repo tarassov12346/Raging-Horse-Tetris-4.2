@@ -72,6 +72,5 @@ public class MongoServiceImpl implements MongoService {
         }
         restTemplate.postForObject("http://mongo-service/snapShot?playerName={playerName}&fileName={fileName}", data, byte[].class, playerName, fileName);
 
-
     }
 }
