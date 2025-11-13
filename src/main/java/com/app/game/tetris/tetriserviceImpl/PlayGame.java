@@ -32,6 +32,18 @@ public class PlayGame implements PlayGameService {
     @Autowired
     private SavedGame savedGame;
 
+    private ScheduledExecutorService service;
+
+    @Override
+    public ScheduledExecutorService getSEService() {
+        return service;
+    }
+
+    @Override
+    public void setSEService(ScheduledExecutorService service) {
+        this.service = service;
+    }
+
     @Override
     public void setState(StateService state) {
         this.state = state;

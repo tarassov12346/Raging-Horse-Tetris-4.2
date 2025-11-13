@@ -8,9 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 @Service
 public class GameServiceImpl implements GameService {
@@ -43,5 +41,13 @@ public class GameServiceImpl implements GameService {
     @Override
     public void doRecord(Game game) {
         restTemplate.postForObject("http://game-service/record", game, Game.class);
+    }
+
+    @Override
+    public Set<Game> getAllBestResults(List<Game> playersList) {
+        Set<Game> highestScoringPlayers = new HashSet<>();
+        playersList.sort(Comparator.comparingInt(Game::getPlayerScore).reversed());
+        highestScoringPlayers.addAll(playersList);
+        return highestScoringPlayers;
     }
 }

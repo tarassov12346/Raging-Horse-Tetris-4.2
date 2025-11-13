@@ -53,8 +53,6 @@ public class TetrisController {
     @Autowired
     DisplayService displayService;
 
-    private ScheduledExecutorService service;
-
     @MessageMapping("/register")
     public void register(Users user) {
         if (usersService.isRolesDBEmpty()) {
@@ -178,7 +176,7 @@ public class TetrisController {
                 new Users(user.getId(), user.getUsername(), user.getPassword(),
                         String.join(";", user.getRoles().stream().map(Roles::getName).collect(Collectors.toList())),
                         user.getRoles())));
-        getAllBestResults(gameService.getAllGames()).
+        gameService.getAllBestResults(gameService.getAllGames()).
                 forEach(game -> this.template.convertAndSend("/receive/results", game));
     }
 
@@ -210,35 +208,35 @@ public class TetrisController {
             case "start" -> {
                 JSONObject jsonGameData = new JSONObject(gameService.getGameData(playGameService.getState().getGame().getPlayerName()));
                 displayService.sendDaoGameToBeDisplayed(playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")), template);
-                service = Executors.newScheduledThreadPool(1);
+                playGameService.setSEService( Executors.newScheduledThreadPool(1));
                 playGameService.setState(playGameService.getState());
-                service.scheduleAtFixedRate(() -> displayService.sendStateToBeDisplayed(playGameService, gameService, service, template), 0, 1000, TimeUnit.MILLISECONDS);
+                playGameService.getSEService().scheduleAtFixedRate(() -> displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(),  template), 0, 1000, TimeUnit.MILLISECONDS);
             }
             case "1" -> {
                 playGameService.setState(playGameService.rotateState((State) playGameService.getState()));
-                displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
+                displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(), template);
             }
             case "2" -> {
                 playGameService.setState(playGameService.moveLeftState((State) playGameService.getState()));
-                displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
+                displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(), template);
             }
             case "3" -> {
                 playGameService.setState(playGameService.moveRightState((State) playGameService.getState()));
-                displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
+                displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(), template);
             }
             case "4" -> {
                 playGameService.setState(playGameService.dropDownState((State) playGameService.getState()));
-                displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
+                displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(), template);
             }
         }
     }
 
     @MessageMapping("/save")
     public void gameSave() {
-        service.shutdown();
+        playGameService.getSEService().shutdown();
         SavedGame savedGame = playGameService.saveGame(playGameService.getState().getGame(), (State) playGameService.getState());
         mongoService.saveGame(savedGame);
-        displayService.sendSavedStateToBeDisplayed(playGameService, gameService, service, template);
+        displayService.sendSavedStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(), template);
     }
 
     @MessageMapping("/restart")
@@ -246,7 +244,7 @@ public class TetrisController {
         if (mongoService.gameRestart(playGameService.getState().getGame().getPlayerName()).isPresent()) {
             SavedGame savedGame = mongoService.gameRestart(playGameService.getState().getGame().getPlayerName()).get();
             playGameService.setState(playGameService.recreateStateFromSavedGame(savedGame));
-            displayService.sendStateToBeDisplayed(playGameService, gameService, service, template);
+            displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(), template);
         }
     }
 
@@ -261,13 +259,6 @@ public class TetrisController {
             mongoService.cleanImageMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShotBest");
             mongoService.loadSnapShotIntoMongodb(playGameService.getState().getGame().getPlayerName(), "deskTopSnapShotBest");
         }
-        displayService.sendFinalStateToBeDisplayed(playGameService, gameService, service, template);
-    }
-
-    private Set<Game> getAllBestResults(List<Game> playersList) {
-        Set<Game> highestScoringPlayers = new HashSet<>();
-        playersList.sort(Comparator.comparingInt(Game::getPlayerScore).reversed());
-        highestScoringPlayers.addAll(playersList);
-        return highestScoringPlayers;
+        displayService.sendFinalStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(), template);
     }
 }
