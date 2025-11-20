@@ -16,7 +16,7 @@ public class Tetramino {
         this.shape = shape;
     }
 
-    public Tetramino buildTetramino(char[][] shape){
+    public Tetramino buildTetramino(char[][] shape) {
         return new Tetramino(shape);
     }
 }

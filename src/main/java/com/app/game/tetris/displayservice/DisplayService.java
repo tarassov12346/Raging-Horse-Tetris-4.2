@@ -8,11 +8,11 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import java.util.concurrent.ScheduledExecutorService;
 
 public interface DisplayService {
-    void sendStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template);
+    void sendStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template, String userId);
 
-    void sendFinalStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template);
+    void sendFinalStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template, String userId);
 
-    void sendSavedStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template);
+    void sendSavedStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template, String userId);
 
     void sendDaoGameToBeDisplayed(Game game, SimpMessagingTemplate template);
 

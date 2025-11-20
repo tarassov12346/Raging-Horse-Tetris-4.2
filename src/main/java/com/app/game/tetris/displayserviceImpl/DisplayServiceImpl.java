@@ -13,29 +13,26 @@ import java.util.concurrent.ScheduledExecutorService;
 @Service
 public class DisplayServiceImpl implements DisplayService {
     @Override
-    public void sendStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template) {
-        playGameService.setState(playGameService.createStateAfterMoveDown((State) playGameService.getState(), service, gameService));
-
-        char[][] cellsToBeDisplayed = playGameService.getState().getStage().drawTetraminoOnCells();
-        State stateToBeSent = playGameService.getState().buildState(playGameService.getState().getStage().buildStage(cellsToBeDisplayed), playGameService.getState().isRunning(), playGameService.getState().getGame());
+    public void sendStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template, String userId) {
+        playGameService.setState(playGameService.createStateAfterMoveDown((State) playGameService.getState(userId), service, gameService), userId);
+        char[][] cellsToBeDisplayed = playGameService.getState(userId).getStage().drawTetraminoOnCells();
+        State stateToBeSent = playGameService.getState(userId).buildState(playGameService.getState(userId).getStage().buildStage(cellsToBeDisplayed), playGameService.getState(userId).isRunning(), playGameService.getState(userId).getGame());
         template.convertAndSend("/receive/stateObjects", stateToBeSent);
     }
 
     @Override
-    public void sendFinalStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template) {
-        playGameService.setState(playGameService.createStateAfterMoveDown((State) playGameService.getState(), service, gameService));
-
-        char[][] cellsToBeDisplayed = playGameService.getState().getStage().drawTetraminoOnCells();
-        State stateToBeSent = playGameService.getState().buildState(playGameService.getState().getStage().buildStage(cellsToBeDisplayed), playGameService.getState().isRunning(), playGameService.getState().getGame());
+    public void sendFinalStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template, String userId) {
+        playGameService.setState(playGameService.createStateAfterMoveDown((State) playGameService.getState(userId), service, gameService), userId);
+        char[][] cellsToBeDisplayed = playGameService.getState(userId).getStage().drawTetraminoOnCells();
+        State stateToBeSent = playGameService.getState(userId).buildState(playGameService.getState(userId).getStage().buildStage(cellsToBeDisplayed), playGameService.getState(userId).isRunning(), playGameService.getState(userId).getGame());
         template.convertAndSend("/receive/stateFinal", stateToBeSent);
     }
 
     @Override
-    public void sendSavedStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template) {
-        playGameService.setState(playGameService.createStateAfterMoveDown((State) playGameService.getState(), service, gameService));
-
-        char[][] cellsToBeDisplayed = playGameService.getState().getStage().drawTetraminoOnCells();
-        State stateToBeSent = playGameService.getState().buildState(playGameService.getState().getStage().buildStage(cellsToBeDisplayed), playGameService.getState().isRunning(), playGameService.getState().getGame());
+    public void sendSavedStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template, String userId) {
+        playGameService.setState(playGameService.createStateAfterMoveDown((State) playGameService.getState(userId), service, gameService), userId);
+        char[][] cellsToBeDisplayed = playGameService.getState(userId).getStage().drawTetraminoOnCells();
+        State stateToBeSent = playGameService.getState(userId).buildState(playGameService.getState(userId).getStage().buildStage(cellsToBeDisplayed), playGameService.getState(userId).isRunning(), playGameService.getState(userId).getGame());
         template.convertAndSend("/receive/stateSaved", stateToBeSent);
     }
 
