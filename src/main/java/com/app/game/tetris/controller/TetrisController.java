@@ -8,7 +8,7 @@ import com.app.game.tetris.model.SavedGame;
 import com.app.game.tetris.model.Users;
 import com.app.game.tetris.mongoservice.MongoService;
 import com.app.game.tetris.tetriservice.PlayGameService;
-import com.app.game.tetris.tetriserviceImpl.State;
+import com.app.game.tetris.model.State;
 import com.app.game.tetris.users_service.UsersService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -214,19 +214,19 @@ public class TetrisController {
                 playGameService.getSEService(userId).scheduleAtFixedRate(() -> displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, userId), 0, 1000, TimeUnit.MILLISECONDS);
             }
             case "1" -> {
-                playGameService.setState(playGameService.rotateState((State) playGameService.getState(userId), userId), userId);
+                playGameService.setState(playGameService.rotateState(playGameService.getState(userId), userId), userId);
                 displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, userId);
             }
             case "2" -> {
-                playGameService.setState(playGameService.moveLeftState((State) playGameService.getState(userId), userId), userId);
+                playGameService.setState(playGameService.moveLeftState(playGameService.getState(userId), userId), userId);
                 displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, userId);
             }
             case "3" -> {
-                playGameService.setState(playGameService.moveRightState((State) playGameService.getState(userId), userId), userId);
+                playGameService.setState(playGameService.moveRightState(playGameService.getState(userId), userId), userId);
                 displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, userId);
             }
             case "4" -> {
-                playGameService.setState(playGameService.dropDownState((State) playGameService.getState(userId), userId), userId);
+                playGameService.setState(playGameService.dropDownState(playGameService.getState(userId), userId), userId);
                 displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, userId);
             }
         }
@@ -236,7 +236,7 @@ public class TetrisController {
     public void gameSave(Principal principal) {
         String userId = String.valueOf(usersService.findUserByUserName(principal.getName()).getId());
         playGameService.getSEService(userId).shutdown();
-        SavedGame savedGame = playGameService.saveGame(playGameService.getState(userId).getGame(), (State) playGameService.getState(userId));
+        SavedGame savedGame = playGameService.saveGame(playGameService.getState(userId).getGame(), playGameService.getState(userId));
         mongoService.saveGame(savedGame);
         displayService.sendSavedStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, userId);
     }
@@ -255,11 +255,11 @@ public class TetrisController {
     public void makeSnapShot(Principal principal) {
         String userId = String.valueOf(usersService.findUserByUserName(principal.getName()).getId());
         JSONObject jsonGameData = new JSONObject(gameService.getGameData(playGameService.getState(userId).getGame().getPlayerName()));
-        gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", (State) playGameService.getState(userId), jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
+        gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", playGameService, playGameService.getState(userId), jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
         mongoService.cleanImageMongodb(playGameService.getState(userId).getGame().getPlayerName(), "deskTopSnapShot");
         mongoService.loadSnapShotIntoMongodb(playGameService.getState(userId).getGame().getPlayerName(), "deskTopSnapShot");
         if (playGameService.getState(userId).getGame().getPlayerScore() >= jsonGameData.getInt("playerbestscore")) {
-            gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", (State) playGameService.getState(userId), jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
+            gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", playGameService, playGameService.getState(userId), jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore"));
             mongoService.cleanImageMongodb(playGameService.getState(userId).getGame().getPlayerName(), "deskTopSnapShotBest");
             mongoService.loadSnapShotIntoMongodb(playGameService.getState(userId).getGame().getPlayerName(), "deskTopSnapShotBest");
         }

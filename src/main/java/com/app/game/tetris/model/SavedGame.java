@@ -11,7 +11,7 @@ public class SavedGame {
 
     private char[][] cells;
 
-    private SavedGame( String playerName,  int playerScore,  char[][] cells) {
+    public SavedGame( String playerName,  int playerScore,  char[][] cells) {
         this.playerName = playerName;
         this.playerScore = playerScore;
         this.cells = cells;

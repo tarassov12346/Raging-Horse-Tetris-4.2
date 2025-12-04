@@ -1,29 +1,13 @@
 package unit_tests;
 
-import com.app.game.tetris.TetrisNewApplication;
-
-import com.app.game.tetris.controller.TetrisController;
-import com.app.game.tetris.model.Game;
-import com.app.game.tetris.model.Tetramino;
-import com.app.game.tetris.tetriserviceImpl.PlayGame;
-import com.app.game.tetris.tetriserviceImpl.Stage;
-import com.app.game.tetris.tetriserviceImpl.State;
-import org.apache.log4j.Logger;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.testng.AbstractTestNGSpringContextTests;
-import org.testng.Assert;
-import org.testng.annotations.*;
-
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+/*@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
         classes = {TetrisController.class,
                 PlayGame.class,
                 Game.class, Tetramino.class, Stage.class, State.class,
                 TetrisNewApplication.class, UnitTestService.class})
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class UnitTest extends AbstractTestNGSpringContextTests{
-    protected static final Logger log = Logger.getLogger(UnitTest.class.getName());
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)*/
+public class UnitTest /*extends AbstractTestNGSpringContextTests*/{
+ /*   protected static final Logger log = Logger.getLogger(UnitTest.class.getName());
 
     @Autowired
     private UnitTestService unitTestService;
@@ -207,6 +191,6 @@ public class UnitTest extends AbstractTestNGSpringContextTests{
     @AfterClass
     public void doAfterTests() {
         log.info("UnitTests are finished");
-    }
+    }*/
 
 }

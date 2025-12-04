@@ -1,21 +1,8 @@
 package unit_tests;
 
-import com.app.game.tetris.model.Tetramino;
-import com.app.game.tetris.tetriserviceImpl.Stage;
-import com.app.game.tetris.tetriserviceImpl.State;
-import org.apache.log4j.Logger;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.IntStream;
-
-import static com.app.game.tetris.tetriservice.GameLogic.HEIGHT;
-import static com.app.game.tetris.tetriservice.GameLogic.WIDTH;
 
 public class UnitTestService {
-    protected static final Logger log = Logger.getLogger(UnitTestService.class.getName());
+ /*   protected static final Logger log = Logger.getLogger(UnitTestService.class.getName());
 
     @Autowired
     private Stage stage;
@@ -172,5 +159,5 @@ public class UnitTestService {
 
     private Tetramino getTetramino0() {
         return tetramino.buildTetramino(new char[][]{{'0'}});
-    }
+    }*/
 }

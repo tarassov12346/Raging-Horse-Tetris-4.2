@@ -12,7 +12,7 @@ public class Tetramino {
         return shape;
     }
 
-    private Tetramino(char[][] shape) {
+    public Tetramino(char[][] shape) {
         this.shape = shape;
     }
 

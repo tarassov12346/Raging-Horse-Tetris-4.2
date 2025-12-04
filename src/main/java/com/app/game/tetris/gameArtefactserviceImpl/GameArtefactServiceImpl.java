@@ -1,7 +1,8 @@
 package com.app.game.tetris.gameArtefactserviceImpl;
 
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
-import com.app.game.tetris.tetriserviceImpl.State;
+import com.app.game.tetris.tetriservice.PlayGameService;
+import com.app.game.tetris.model.State;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
@@ -18,14 +19,14 @@ public class GameArtefactServiceImpl implements GameArtefactService {
     String shotsPath;
 
     @Override
-    public void makeDesktopSnapshot(String fileNameDetail, State state, String bestPlayerName, int bestPlayerScore) {
+    public void makeDesktopSnapshot(String fileNameDetail, PlayGameService playGameService, State state, String bestPlayerName, int bestPlayerScore) {
         String pathToShots = System.getProperty("user.dir") + shotsPath;
         String format = "jpg";
         String fileName = pathToShots + fileNameDetail + "." + format;
         try (Playwright playwright = Playwright.create()) {
             Browser browser = playwright.firefox().launch(new BrowserType.LaunchOptions().setHeadless(true));
             Page page = browser.newPage();
-            char[][] cells = state.getStage().drawTetraminoOnCells();
+            char[][] cells = playGameService.drawTetraminoOnCells(state);
             page.navigate("http://localhost:8080/html/snapShot.html");
             for (int i = 0; i < 20; i++) {
                 for (int j = 0; j < 12; j++) {

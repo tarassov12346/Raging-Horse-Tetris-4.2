@@ -20,7 +20,7 @@ public class Game {
     public Game() {
     }
 
-    private Game(String playerName, int playerScore) {
+    public Game(String playerName, int playerScore) {
         this.playerName = playerName;
         this.playerScore = playerScore;
     }
