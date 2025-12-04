@@ -3,6 +3,7 @@ package com.app.game.tetris.tetriserviceImpl;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.*;
 import com.app.game.tetris.tetriservice.PlayGameService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -12,8 +13,8 @@ import java.util.stream.IntStream;
 
 @Service
 public class PlayGame implements PlayGameService {
-    int WIDTH = 12;
-    int HEIGHT = 20;
+    @Value("${width}") int WIDTH;
+    @Value("${height}") int HEIGHT;
     private final ConcurrentHashMap<String, State> userStates = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ScheduledExecutorService> userExecutors = new ConcurrentHashMap<>();
 
@@ -103,7 +104,7 @@ public class PlayGame implements PlayGameService {
 
     @Override
     public Optional<State> moveDownState(State state) {
-        return moveDown(state, state.getStepDown());
+        return moveDown(state, getStepDown(state));
     }
 
     @Override
@@ -214,7 +215,7 @@ public class PlayGame implements PlayGameService {
     }
 
     private Optional<State> createStateWithNewTetramino(State state) {
-        final Tetramino t = getRandomTetramino(state);
+        final Tetramino t = getRandomTetramino();
         State newState = burryTetramino(state).orElse(state);
         newState = buildState(collapseFilledLayers(newState), newState.isRunning(), newState.getGame());
         newState = updatePlayerScore(newState);
@@ -223,23 +224,23 @@ public class PlayGame implements PlayGameService {
     }
 
     private Optional<State> restartWithNewTetramino(State state) {
-        final Tetramino t = getRandomTetramino(state);
+        final Tetramino t = getRandomTetramino();
         State newState = burryTetramino(state).orElse(state);
         newState = initiateTetramino(t, (WIDTH - t.getShape().length) / 2, 0, newState).orElse(newState);
         return !checkCollision(newState, 0, 0, false) ? Optional.of(newState) : Optional.empty();
     }
 
-    private Tetramino getRandomTetramino(State state) {
+    private Tetramino getRandomTetramino() {
         final Map<Character, Tetramino> tetraminoMap = new HashMap<>();
-        tetraminoMap.put('0', state.getStage().getTetramino().buildTetramino(new char[][]{{'0'}}));
-        tetraminoMap.put('I', state.getStage().getTetramino().buildTetramino(new char[][]{{'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}}));
-        tetraminoMap.put('J', state.getStage().getTetramino().buildTetramino(new char[][]{{'0', 'J', '0'}, {'0', 'J', '0'}, {'J', 'J', '0'}}));
-        tetraminoMap.put('L', state.getStage().getTetramino().buildTetramino(new char[][]{{'0', 'L', '0'}, {'0', 'L', '0'}, {'0', 'L', 'L'}}));
-        tetraminoMap.put('O', state.getStage().getTetramino().buildTetramino(new char[][]{{'O', 'O'}, {'O', 'O'}}));
-        tetraminoMap.put('S', state.getStage().getTetramino().buildTetramino(new char[][]{{'0', 'S', 'S'}, {'S', 'S', '0'}, {'0', '0', '0'}}));
-        tetraminoMap.put('T', state.getStage().getTetramino().buildTetramino(new char[][]{{'0', '0', '0'}, {'T', 'T', 'T'}, {'0', 'T', '0'}}));
-        tetraminoMap.put('Z', state.getStage().getTetramino().buildTetramino(new char[][]{{'Z', 'Z', '0'}, {'0', 'Z', 'Z'}, {'0', '0', '0'}}));
-        tetraminoMap.put('K', state.getStage().getTetramino().buildTetramino(new char[][]{{'K', 'K', 'K'}, {'0', 'K', '0'}, {'0', 'K', '0'}}));
+        tetraminoMap.put('0', buildTetramino(new char[][]{{'0'}}));
+        tetraminoMap.put('I', buildTetramino(new char[][]{{'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}}));
+        tetraminoMap.put('J', buildTetramino(new char[][]{{'0', 'J', '0'}, {'0', 'J', '0'}, {'J', 'J', '0'}}));
+        tetraminoMap.put('L', buildTetramino(new char[][]{{'0', 'L', '0'}, {'0', 'L', '0'}, {'0', 'L', 'L'}}));
+        tetraminoMap.put('O', buildTetramino(new char[][]{{'O', 'O'}, {'O', 'O'}}));
+        tetraminoMap.put('S', buildTetramino(new char[][]{{'0', 'S', 'S'}, {'S', 'S', '0'}, {'0', '0', '0'}}));
+        tetraminoMap.put('T', buildTetramino(new char[][]{{'0', '0', '0'}, {'T', 'T', 'T'}, {'0', 'T', '0'}}));
+        tetraminoMap.put('Z', buildTetramino(new char[][]{{'Z', 'Z', '0'}, {'0', 'Z', 'Z'}, {'0', '0', '0'}}));
+        tetraminoMap.put('K', buildTetramino(new char[][]{{'K', 'K', 'K'}, {'0', 'K', '0'}, {'0', 'K', '0'}}));
         final char[] tetraminos = "IJLOSTZK".toCharArray();
         return tetraminoMap.get(tetraminos[new Random().nextInt(tetraminos.length)]);
     }
@@ -297,5 +298,9 @@ public class PlayGame implements PlayGameService {
 
     private SavedGame buildSavedGame(String playerName, int playerScore, char[][] cells) {
         return new SavedGame(playerName, playerScore, cells);
+    }
+
+    private int getStepDown(State state) {
+        return state.getGame() == null ? 1 : state.getGame().getPlayerScore() / 10 + 1;
     }
 }
