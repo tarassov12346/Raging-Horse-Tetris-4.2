@@ -46,11 +46,7 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
-		<dependency>
-				<groupId>org.asynchttpclient</groupId>
-				<artifactId>async-http-client</artifactId>
-				<version>3.0.1</version>
-		</dependency>
+
 
 
 		<dependency>
