@@ -1,20 +1,14 @@
 package com.app.game.tetris.model;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 
 @Data
-@RequiredArgsConstructor
+@AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Game {
-    private Long id;
 
-    @NonNull
     @EqualsAndHashCode.Include
     private String playerName;
 
-    @NonNull
     private int playerScore;
 }
