@@ -3,12 +3,15 @@ package com.app.game.tetris.model;
 import lombok.*;
 
 @Data
-@AllArgsConstructor
+@RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Game {
 
+    private Long id;
+
     @EqualsAndHashCode.Include
+    @NonNull
     private String playerName;
 
-    private int playerScore;
+    private final int playerScore;
 }

@@ -30,7 +30,7 @@ public class GameArtefactServiceImpl implements GameArtefactService {
         String pathToShots = System.getProperty("user.dir") + shotsPath;
         String format = "jpg";
         String fileName = pathToShots + fileNameDetail + "." + format;
-        Page page = browser.newPage();
+        try(Page page = browser.newPage()){
         char[][] cells = playGameService.drawTetraminoOnCells(state);
         page.navigate(baseUrl + "/html/snapShot.html");
         for (int i = 0; i < 20; i++) {
@@ -56,6 +56,6 @@ public class GameArtefactServiceImpl implements GameArtefactService {
         page.waitForSelector("#gameStatusBox", new Page.WaitForSelectorOptions().setState(WaitForSelectorState.VISIBLE));
         // Вариант 2: Ждем, пока все изображения загрузятся (надежнее)
         //  page.waitForFunction("() => Array.from(document.querySelectorAll('img')).every(img => img.complete)");
-        page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get(fileName)));
+        page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get(fileName)));}
     }
 }
