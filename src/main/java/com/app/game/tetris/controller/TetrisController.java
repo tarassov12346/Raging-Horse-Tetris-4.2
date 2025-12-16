@@ -1,6 +1,7 @@
 package com.app.game.tetris.controller;
 
 import com.app.game.tetris.displayservice.DisplayService;
+import com.app.game.tetris.dto.UserRegistrationDto;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Roles;
@@ -11,6 +12,7 @@ import com.app.game.tetris.tetriservice.PlayGameService;
 import com.app.game.tetris.users_service.UsersService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.json.JSONObject;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -47,32 +49,21 @@ public class TetrisController {
     }
 
     @MessageMapping("/register")
-    public void register(Users user) {
+    public void register(@Valid UserRegistrationDto userDto) {
         if (usersService.isRolesDBEmpty()) {
             usersService.prepareRolesDB();
             usersService.prepareUserDB();
         }
         Users newUser = new Users();
-        if (!user.getUsername().matches(".*[a-zA-Z]+.*")) {
-            this.template.convertAndSend("/receive/message", "The user name should contain at least one letter!");
-            return;
-        }
-        if (!user.getPassword().matches(".*[a-zA-Z]+.*") || !user.getPassword().matches("(.)*(\\d)(.)*")) {
-            this.template.convertAndSend("/receive/message", "The password should contain at least one letter and one digit!");
-            return;
-        }
-        if (user.getPassword().equals(user.getPasswordConfirm())) {
-            newUser.setUsername(user.getUsername());
-            newUser.setPassword(user.getPassword());
-            newUser.setPasswordConfirm(user.getPasswordConfirm());
+        if (userDto.getPassword().equals(userDto.getPasswordConfirm())) {
+            newUser.setUsername(userDto.getUsername());
+            newUser.setPassword(userDto.getPassword());
+            newUser.setPasswordConfirm(userDto.getPasswordConfirm());
         } else {
             this.template.convertAndSend("/receive/message", "The password is not confirmed!");
+            return;
         }
-        if (!usersService.saveUser(newUser)) {
-            this.template.convertAndSend("/receive/message", "This user already exists!");
-        } else {
-            this.template.convertAndSend("/receive/message", "The user " + newUser.getUsername() + " has been successfully registered!");
-        }
+        this.template.convertAndSend("/receive/message", usersService.saveUser(newUser) ? "The user " + newUser.getUsername() + " has been successfully registered!" : "This user already exists!");
     }
 
     @MessageMapping("/hello")
