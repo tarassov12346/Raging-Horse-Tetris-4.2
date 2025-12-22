@@ -1,10 +1,11 @@
 package com.app.game.tetris.dto;
 
+import com.app.game.tetris.validation.ConfirmPassword;
 import com.app.game.tetris.validation.ContainsLetter;
 import com.app.game.tetris.validation.ContainsLetterDigit;
 import jakarta.validation.constraints.NotBlank;
 
-
+@ConfirmPassword(message = "The password is not confirmed!")
 public class UserRegistrationDto {
     @NotBlank(message = "Username is mandatory")
     @ContainsLetter(message = "The username must contain at least one letter!!!!!!!") // Наша кастомная аннотация

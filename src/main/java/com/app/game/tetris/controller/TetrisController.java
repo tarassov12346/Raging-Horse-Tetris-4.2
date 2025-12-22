@@ -55,14 +55,9 @@ public class TetrisController {
             usersService.prepareUserDB();
         }
         Users newUser = new Users();
-        if (userDto.getPassword().equals(userDto.getPasswordConfirm())) {
-            newUser.setUsername(userDto.getUsername());
-            newUser.setPassword(userDto.getPassword());
-            newUser.setPasswordConfirm(userDto.getPasswordConfirm());
-        } else {
-            this.template.convertAndSend("/receive/message", "The password is not confirmed!");
-            return;
-        }
+        newUser.setUsername(userDto.getUsername());
+        newUser.setPassword(userDto.getPassword());
+        newUser.setPasswordConfirm(userDto.getPasswordConfirm());
         this.template.convertAndSend("/receive/message", usersService.saveUser(newUser) ? "The user " + newUser.getUsername() + " has been successfully registered!" : "This user already exists!");
     }
 
