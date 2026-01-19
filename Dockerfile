@@ -1,21 +1,25 @@
-# Сборка
-FROM maven:3.9.4-eclipse-temurin-17 AS build
+# --- ЭТАП 1: Сборка ---
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
+
+# Копируем только помник для кэширования слоев
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
+
+# Собираем проект
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-# Запуск - используем ARG чтобы обойти ошибку парсинга ://
-ARG REGISTRY=mcr.microsoft.com
-FROM ${REGISTRY}/playwright/java:v1.40.0-jammy
+# --- ЭТАП 2: Запуск ---
+# Используем прямой адрес без переменных и скрытых символов
+FROM ://mcr.microsoft.com
 
-# Установка Java 17
+# Установка Java 17 (в образе Playwright может быть другая версия)
 RUN apt-get update && apt-get install -y openjdk-17-jre && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Копируем ваш WAR (название строго по pom.xml)
+# Копируем WAR (убедитесь, что имя совпадает с вашим artifactId и version)
 COPY --from=build /app/target/Raging-Horse-Tetris-4.2-0.0.1-SNAPSHOT.war app.war
 
 # Создаем папки для скриншотов
@@ -23,5 +27,5 @@ RUN mkdir -p /app/static/shots /app/static/mongoPrepareShots
 
 EXPOSE 8080
 
-# Запуск с исправлением путей (в Linux нужны прямые слэши /)
+# Запуск с явным указанием путей для Linux (вместо Windows-путей из properties)
 ENTRYPOINT ["java", "-jar", "app.war", "--shotsPath=/app/static/shots/", "--mongoPrepareShotsPath=/app/static/mongoPrepareShots/"]
