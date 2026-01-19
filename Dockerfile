@@ -1,37 +1,29 @@
-# --- ЭТАП 1: Сборка ---
+# Этап 1: Сборка
 FROM maven:3.9.4-eclipse-temurin-17 AS build
 WORKDIR /app
-
-# Кэшируем зависимости
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
-
-# Сборка
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-# --- ЭТАП 2: Запуск ---
-# Используем официальный образ Playwright
+# Этап 2: Запуск
 FROM ://mcr.microsoft.com
 
-# Устанавливаем Java 17 (в образе Playwright по умолчанию может быть другая версия)
+# Установка Java 17
 RUN apt-get update && apt-get install -y openjdk-17-jre && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Копируем WAR файл (имя точно по твоему pom.xml)
+# Копируем собранный WAR (имя из вашего pom.xml)
 COPY --from=build /app/target/Raging-Horse-Tetris-4.2-0.0.1-SNAPSHOT.war app.war
 
-# Исправляем пути для Linux, переопределяя проперти через ENV
-# В Docker используем прямые слэши /
-ENV SHOTSPATH=/app/static/shots/
-ENV MONGOPREPARESHOTSPATH=/app/static/mongoPrepareShots/
-ENV EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:1111/eureka
-
-# Создаем папки
+# Создаем папки для скриншотов (в Linux путях)
 RUN mkdir -p /app/static/shots /app/static/mongoPrepareShots
+
+# Переопределяем пути из application.properties на Linux-формат
+ENV SHOTS_PATH=/app/static/shots/
+ENV MONGO_PATH=/app/static/mongoPrepareShots/
 
 EXPOSE 8080
 
-# Запуск с переопределением путей, чтобы не менять сам файл application.properties
-ENTRYPOINT ["java", "-jar", "app.war", "--shotsPath=${SHOTSPATH}", "--mongoPrepareShotsPath=${MONGOPREPARESHOTSPATH}"]
+ENTRYPOINT ["java", "-jar", "app.war", "--shotsPath=${SHOTS_PATH}", "--mongoPrepareShotsPath=${MONGO_PATH}"]
