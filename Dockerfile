@@ -36,7 +36,8 @@ RUN mkdir -p /app/src/main/resources/static/shots \
 
 # Установка браузеров Playwright (обязательно для работы в контейнере)
 # Запускаем установку через CLI из уже скопированного архива
-RUN java -cp app.war com.microsoft.playwright.CLI install --with-deps chromium
+RUN java -cp app.war -Dloader.main=com.microsoft.playwright.CLI org.springframework.boot.loader.PropertiesLauncher install --with-deps chromium
+
 
 # Пробрасываем порт
 EXPOSE 8080
