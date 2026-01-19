@@ -37,5 +37,9 @@ RUN mkdir -p /app/src/main/resources/static/shots \
 # Пробрасываем порт
 EXPOSE 8080
 
+# Вставьте это перед ENTRYPOINT в Dockerfile
+RUN zip -d app.war WEB-INF/lib/slf4j-simple-2.0.11.jar || true
+
+
 # Запуск приложения (без команд установки браузеров)
 ENTRYPOINT ["java", "-jar", "app.war", "--shotsPath=/app/src/main/resources/static/shots/", "--mongoPrepareShotsPath=/app/src/main/resources/static/mongoPrepareShots/"]
