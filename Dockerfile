@@ -12,7 +12,7 @@ RUN mvn clean package -DskipTests
 
 # --- ЭТАП 2: Запуск ---
 # Используем прямой адрес без переменных и скрытых символов
-FROM ://mcr.microsoft.com
+FROM ubuntu:20.04
 
 # Установка Java 17 (в образе Playwright может быть другая версия)
 RUN apt-get update && apt-get install -y openjdk-17-jre && rm -rf /var/lib/apt/lists/*
