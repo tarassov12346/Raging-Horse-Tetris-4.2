@@ -6,42 +6,47 @@
 
     <style>
         body {
-  font-family: 'Courier New', monospace;
-  font-size: 25px;
-  background-color: rgb(100, 100, 100);
-     }
-
-#registration{text-align: center;}
+            font-family: 'Courier New', monospace;
+            font-size: 25px;
+            background-color: rgb(100, 100, 100);
+        }
+        #registration{text-align: center;}
     </style>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
-
     <script>
- var stompClient = null;
+        // --- КОНФИГУРАЦИЯ АДРЕСА ---
+        var BASE_URL = "http://localhost:8080";
+        // ---------------------------
 
- setTimeout(connect,500);
+        var stompClient = null;
+
+        setTimeout(connect, 500);
 
         function setConnected(connected) {
-         $("#registerButton").prop("disabled", connected);
-         $("#logInButton").prop("disabled", connected);
+            $("#registerButton").prop("disabled", connected);
+            $("#logInButton").prop("disabled", connected);
         }
 
         function frameHandler(frame) {
             setConnected(true);
             console.log('Connected: ' + frame);
             stompClient.subscribe('/receive/message', function (message) {
-              playSound('registered_sound');
-              window.alert(message.body);
+                playSound('registered_sound');
+                window.alert(message.body);
             });
         }
 
-           function connect() {
+        function connect() {
+            // Формируем ws адрес из BASE_URL (заменяем http на ws)
+            var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/register";
+
             stompClient = new window.StompJs.Client({
                 webSocketFactory: function () {
-                    return new WebSocket("ws://localhost:8080/register");
+                    return new WebSocket(wsUrl);
                 }
             });
             stompClient.onConnect = function (frame) {
@@ -54,8 +59,7 @@
             stompClient.activate();
         }
 
-
-         function sendUser() {
+        function sendUser() {
             stompClient.publish({
                 destination:"/app/register",
                 body: JSON.stringify({
@@ -67,49 +71,49 @@
         }
 
         $(function () {
-           $("#registerButton").click(function () {
+            $("#registerButton").click(function () {
                 sendUser();
             });
 
+            // Динамически подставляем пути к звукам при загрузке
+            $("#registered_sound source[type='audio/mpeg']").attr("src", BASE_URL + "/sounds/registered.mp3");
+            $("#registered_sound source[type='audio/ogg']").attr("src", BASE_URL + "/sounds/registered.ogg");
+            $("#registered_sound")[0].load(); // Перезагружаем аудио-элемент
         });
 
-       function playSound(id){
-          var audio = document.getElementById(id);
-           audio.play();
-       }
-
-       function logIn() {
-          window.location = "http://localhost:8080/html/hello.html";
+        function playSound(id){
+            var audio = document.getElementById(id);
+            audio.play();
         }
-</script>
+
+        function logIn() {
+            window.location = BASE_URL + "/html/hello.html";
+        }
+    </script>
 </head>
 
 <body>
 
 <div id="registration">
-
-        <h2>REGISTRATION FORM</h2>
-
+    <h2>REGISTRATION FORM</h2>
     <p>New users name: <input type="text" id="username"></p>
     <p>New users password: <input type="password" id="password"></p>
     <p>New users password confirm: <input type="password" id="passwordConfirm"></p>
 
-
-        <button  id="registerButton" disabled type="submit">REGISTER YOURSELF AS USER</button>
+    <button id="registerButton" disabled type="submit">REGISTER YOURSELF AS USER</button>
 
     <div id="controls">
         <button id="logInButton" disabled type="button" class="buttonLogIn" onclick="logIn()" >LOGIN</button>
     </div>
 
-
     <img class="displayed" src="../img/black.png" alt="" width="240" height="384" >
-
-
-
 </div>
+
 <audio id="registered_sound">
-    <source  src="http://localhost:8080/sounds/registered.mp3" type="audio/mpeg"></source>
-    <source  src="http://localhost:8080/sounds/registered.ogg" type="audio/ogg"></source>
+    <!-- src будут установлены через jQuery при загрузке страницы -->
+    <source type="audio/mpeg"></source>
+    <source type="audio/ogg"></source>
 </audio>
+
 </body>
 </html>
