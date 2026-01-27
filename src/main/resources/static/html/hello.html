@@ -6,56 +6,35 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.css" rel="stylesheet"/>
     <style>
          body {
-  font-family: 'Courier New', monospace;
-  font-size: 25px;
-  background-color: rgb(255, 0, 0);
-}
-
-#controls{text-align: center;}
-
-.buttonStart {
-    position: absolute;
-    font-size: 16px;
-    top:50%;
-    background-color:#0a0a23;
-    color: #fff;
-}
-
-.buttonProfile {
-    font-size: 16px;
-    background-color:#0a0a11;
-    color: #fff;
-}
-
-.buttonAdmin {
-    font-size: 16px;
-    background-color:#0a0a11;
-    color: #fff;
-}
-
-#header{text-align: center;}
-
-#helloBox{font-size: 50px;}
-#bestPlayerBox{font-size: 35px;}
-#bestScoreBox{font-size: 35px;}
-
-img.displayed {
-    display: block;
-    margin-left: auto;
-    margin-right: auto }
-
-img.raging {
-    display: block;
-    margin-left: auto;
-    margin-right: auto }
+            font-family: 'Courier New', monospace;
+            font-size: 25px;
+            background-color: rgb(255, 0, 0);
+        }
+        #controls{text-align: center;}
+        .buttonStart { position: absolute; font-size: 16px; top:50%; background-color:#0a0a23; color: #fff; }
+        .buttonProfile { font-size: 16px; background-color:#0a0a11; color: #fff; }
+        .buttonAdmin { font-size: 16px; background-color:#0a0a11; color: #fff; }
+        #header{text-align: center;}
+        #helloBox{font-size: 50px;}
+        #bestPlayerBox{font-size: 35px;}
+        #bestScoreBox{font-size: 35px;}
+        img.displayed { display: block; margin-left: auto; margin-right: auto }
+        img.raging { display: block; margin-left: auto; margin-right: auto }
     </style>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+
     <script>
+        // --- КОНФИГУРАЦИЯ АДРЕСА ---
+        var BASE_URL = "http://localhost:8080";
+        // var BASE_URL = "";
+        // ---------------------------
+
         var stompClient = null;
 
-        setTimeout(connect,500);
+        setTimeout(connect, 500);
 
         function setConnected(connected) {
             $("#startGameButton").prop("disabled", connected);
@@ -78,22 +57,22 @@ img.raging {
         }
 
         function connect() {
+            // Автоматическая замена http на ws для сокетов
+            var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/websocket";
+
             stompClient = new window.StompJs.Client({
                 webSocketFactory: function () {
-                    return new WebSocket("ws://localhost:8080/websocket");
+                    return new WebSocket(wsUrl);
                 }
             });
             stompClient.onConnect = function (frame) {
                 frameHandlerDaoGame(frame)
-
-                 frameHandlerGame(frame)
-                 setConnected(false)
+                frameHandlerGame(frame)
+                setConnected(false)
 
                 stompClient.publish({
-                destination:"/app/hello",
-                  body: JSON.stringify({
-                    '': ''
-                  })
+                    destination:"/app/hello",
+                    body: JSON.stringify({ '': '' })
                 })
             };
 
@@ -102,21 +81,19 @@ img.raging {
             };
 
             playSound('hello_sound');
-
             stompClient.activate();
-
         }
 
         function index() {
-            window.location = "http://localhost:8080/html/index.html";
+            window.location = BASE_URL + "/html/index.html";
         }
 
         function admin() {
-            window.location = "http://localhost:8080/html/admin.html";
+            window.location = BASE_URL + "/html/admin.html";
         }
 
         function profile() {
-            window.location = "http://localhost:8080/html/profile.html";
+            window.location = BASE_URL + "/html/profile.html";
         }
 
         function showDaoGame(game) {
@@ -134,7 +111,10 @@ img.raging {
         }
 
         $(function () {
-
+            // Динамическая подстановка адресов звуков
+            $("#hello_sound source[type='audio/mpeg']").attr("src", BASE_URL + "/sounds/hello.mp3");
+            $("#hello_sound source[type='audio/ogg']").attr("src", BASE_URL + "/sounds/hello.ogg");
+            $("#hello_sound").get(0).load();
 
             $("#startGameButton").click(function () {
                 index();
@@ -147,33 +127,29 @@ img.raging {
             $("#profileButton").click(function () {
                 profile();
             });
-
-
         });
 
         function playSound(id){
           var audio = document.getElementById(id);
-         if (id == 'snap_sound')
-           {
-             if (typeof audio.loop == 'boolean')
-               {
+          if (!audio) return;
+
+          if (id == 'snap_sound') {
+             if (typeof audio.loop == 'boolean') {
                  audio.loop = true;
-               }
-             else
-               {
+             } else {
                   audio.addEventListener('ended', function() {
-                  this.currentTime = 0;
-                  this.play();
-                      }, false);
-                  }
-           }
-           audio.play();
+                      this.currentTime = 0;
+                      this.play();
+                  }, false);
+             }
+          }
+          audio.play().catch(function(e) {
+              console.log("Autoplay blocked or audio not loaded yet");
+          });
         }
     </script>
 </head>
 <body>
-
-
 
 <h1 text align="center"> <b id="helloBox"> </b> </h1>
 <h2 text align="center"> <b id="bestPlayerBox"> </b> </h2>
@@ -188,8 +164,8 @@ img.raging {
 </div>
 
 <audio id="hello_sound">
-    <source  src="http://localhost:8080/sounds/hello.mp3" type="audio/mpeg"></source>
-    <source  src="http://localhost:8080/sounds/hello.ogg" type="audio/ogg"></source>
+    <source type="audio/mpeg"></source>
+    <source type="audio/ogg"></source>
 </audio>
 
 </body>

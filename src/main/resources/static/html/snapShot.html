@@ -11,315 +11,50 @@
            font-size: 14px;
            background-color: rgb(255, 255, 128);
         }
+
     </style>
 
 </head>
-
 <body>
-
-<h1 text align="center"> <b id="tetrisSpeedBox">  </b> </h1>
-<h2 text align="center"> <b id="gameStatusBox">  </b> </h2>
+<h1 text align="center"><b id="tetrisSpeedBox"> </b></h1>
+<h2 text align="center"><b id="gameStatusBox"> </b></h2>
 
 <table align="center" style="background-color: #ffffff; border:1px black solid;" border="1" width="600">
     <tr>
-        <td> <b> Player </b> </td>
-        <td id="playerBox"> </td>
-        <td> <b> Score </b> </td>
-        <td id="playerScoreBox"> </td>
+        <td><b> Player </b></td>
+        <td id="playerBox"></td>
+        <td><b> Score </b></td>
+        <td id="playerScoreBox"></td>
     </tr>
     <tr>
-        <td> <b> Best Player </b></td>
-        <td id="bestPlayerBox"> </td>
-        <td> <b> Best Score </b> </td>
-        <td id="bestPlayerScoreBox"> </td>
+        <td><b> Best Player </b></td>
+        <td id="bestPlayerBox"></td>
+        <td><b> Best Score </b></td>
+        <td id="bestPlayerScoreBox"></td>
     </tr>
 </table>
 
-<table id= "table" align="center" style="background-color: #ffffff; border:1px black solid;">
-    <tr>
-        <td><img id="c0v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c0v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c1v0"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v1"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v2"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v3"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v4"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v5"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v6"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v7"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v8"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v9"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v10"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c1v11"src="http://localhost:8080/img/0.png"></td>
-    </tr>
-
-    <tr>
-        <td><img id="c2v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v1"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v2"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v3"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v4"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v5"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v6"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v7"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v8"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v9"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v10"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c2v11"src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c3v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c3v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c4v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c4v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c5v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v10"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c5v11" src="http://localhost:8080/img/0.png"></td>
-
-    </tr>
-    <tr>
-        <td><img id="c6v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c6v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c7v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v10"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c7v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c8v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c8v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c9v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c9v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c10v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c10v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c11v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v10"src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c11v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c12v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c12v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c13v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c13v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c14v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c14v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c15v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c15v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c16v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c16v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c17v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c17v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c18v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c18v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
-    <tr>
-        <td><img id="c19v0" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v1" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v2" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v3" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v4" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v5" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v6" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v7" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v8" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v9" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v10" src="http://localhost:8080/img/0.png"></td>
-        <td><img id="c19v11" src="http://localhost:8080/img/0.png"></td>
-    </tr>
+<table id="table" align="center" style="background-color: #ffffff; border:1px black solid;">
+    <!-- Таблица будет создана автоматически скриптом -->
 </table>
-</div>
 
+<script>
+    // Исполняем немедленно, не дожидаясь полной загрузки всех картинок
+    (function generateTable() {
+        var baseUrl = "localhost:8080";
+        // var baseUrl ="";
+        var table = document.getElementById("table");
+        var html = "";
+        for (var r = 0; r < 20; r++) {
+            html += "<tr>";
+            for (var v = 0; v < 12; v++) {
+                html += '<td><img id="c' + r + 'v' + v + '" src="http://' + baseUrl + '/img/0.png"></td>';
+            }
+            html += "</tr>";
+        }
+        table.innerHTML = html;
+    })();
+
+</script>
 </body>
 </html>

@@ -92,114 +92,130 @@
     <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script>
+    // Базовая переменная для адреса сервера
+    var baseUrl = "localhost:8080";
+    // var baseUrl = "";
+    var httpUrl = "http://" + baseUrl;
+    var stompClient = null;
 
-        var stompClient = null;
-        setTimeout(connect,500);
+    setTimeout(connect, 500);
 
+    function setConnected(connected) {
+        $("#startGameButton").prop("disabled", connected);
+    }
 
-        function setConnected(connected) {
-            $("#startGameButton").prop("disabled", connected);
-        }
+    function frameHandlerPlayerStat(frame) {
+        setConnected(true);
+        console.log('Connected: ' + frame);
+        stompClient.subscribe('/receive/playerStat', function (game) {
+            showPlayerStat(game.body);
+        });
+    }
 
-        function frameHandlerPlayerStat(frame) {
-            setConnected(true);
-            console.log('Connected: ' + frame);
-            stompClient.subscribe('/receive/playerStat', function (game) {
-                showPlayerStat(game.body);
-            });
-        }
+    function frameHandlerPlayerAttemptsNumber(frame) {
+        setConnected(true);
+        console.log('Connected: ' + frame);
+        stompClient.subscribe('/receive/playerAttemptsNumber', function (number) {
+            showPlayerAttemptsNumber(number.body);
+        });
+    }
 
-        function frameHandlerPlayerAttemptsNumber(frame) {
-            setConnected(true);
-            console.log('Connected: ' + frame);
-            stompClient.subscribe('/receive/playerAttemptsNumber', function (number) {
-                showPlayerAttemptsNumber(number.body);
-            });
-        }
+    function showPlayerStat(game) {
+       var jsonGame = JSON.parse(game);
+       var player = jsonGame['playerName'];
+       var score = jsonGame['playerScore'];
+       $("#profileBox").text('Hello ' + player + '!' + ' Your best score is ' + score);
+    }
 
-        function showPlayerStat(game) {
-           var jsonGame = JSON.parse(game);
-           var player = jsonGame['playerName'];
-           var score = jsonGame['playerScore'];
-           $("#profileBox").text('Hello '+player+'!'+' Your best score is '+score);
-        }
+    function showPlayerAttemptsNumber(game) {
+       var jsonGame = JSON.parse(game);
+       var attempts = jsonGame['playerScore'];
+       $("#profileAttemptsBox").text('You have played ' + attempts + ' times!');
+    }
 
-        function showPlayerAttemptsNumber(game) {
-           var jsonGame = JSON.parse(game);
-           var attempts = jsonGame['playerScore'];
-           $("#profileAttemptsBox").text('You have played '+attempts+' times!');
-        }
-
-        function connect() {
-
-        var wb = new WebSocket("ws://localhost:8080/websocket");
+    function connect() {
+        // Используем baseUrl для WebSocket (добавляем протокол ws://)
+        var wb = new WebSocket("ws://" + baseUrl + "/websocket");
 
         wb.binaryType = "arraybuffer";
 
-
-            stompClient = new window.StompJs.Client({
-                webSocketFactory: function () {
-                    return wb;
-                }
-            });
-            stompClient.onConnect = function (frame) {
-                frameHandlerPlayerStat(frame)
-                frameHandlerPlayerAttemptsNumber(frame)
-
-                 setConnected(false)
-
-                stompClient.publish({
-                destination:"/app/profile",
-                  body: JSON.stringify({
-                    '': ''
-                  })
-                })
-            };
-
-            stompClient.onWebsocketClose = function () {
-                onSocketClose();
-            };
-
-            playSound('profile_sound');
-            stompClient.activate();
-        }
-
-        function playSound(id){
-          var audio = document.getElementById(id);
-           audio.play();
-       }
-
-        function index() {
-            window.location = "http://localhost:8080/html/index.html";
-        }
-
-        $(function () {
-            $("#startGameButton").click(function () {
-                index();
-            });
-            $("#uploadButton").click(function () {
-               sendFile();
-            });
+        stompClient = new window.StompJs.Client({
+            webSocketFactory: function () {
+                return wb;
+            }
         });
 
-         function sendFile() {
-            var file = document.getElementById('filename').files[0];
-            var base64String = "";
-            var reader = new FileReader();
-            reader.onload = function () {
+        stompClient.onConnect = function (frame) {
+            frameHandlerPlayerStat(frame)
+            frameHandlerPlayerAttemptsNumber(frame)
+
+            setConnected(false)
+
+            stompClient.publish({
+                destination: "/app/profile",
+                body: JSON.stringify({ '': '' })
+            })
+        };
+
+        stompClient.onWebsocketClose = function () {
+            onSocketClose();
+        };
+
+        playSound('profile_sound');
+        stompClient.activate();
+    }
+
+    function playSound(id) {
+        var audio = document.getElementById(id);
+        audio.play();
+    }
+
+    function index() {
+        // Используем baseUrl для редиректа (добавляем протокол http://)
+        window.location = "http://" + baseUrl + "/html/index.html";
+    }
+
+    $(function () {
+        // 1. Обновляем пути для картинок
+    $(".js-url").each(function() {
+        var path = $(this).data("src");
+        $(this).attr("src", httpUrl + path);
+    });
+
+    // 2. Обновляем пути для аудио
+    $("#src-mp3").attr("src", httpUrl + "/sounds/profile.mp3");
+    $("#src-ogg").attr("src", httpUrl + "/sounds/profile.ogg");
+
+    // Загружаем аудио заново, так как пути изменились
+    $("#profile_sound")[0].load();
+
+    // Твои старые обработчики кликов
+    $("#startGameButton").click(function () {
+        index();
+    });
+    $("#uploadButton").click(function () {
+       sendFile();
+    });
+    });
+
+    function sendFile() {
+        var file = document.getElementById('filename').files[0];
+        var base64String = "";
+        var reader = new FileReader();
+        reader.onload = function () {
             base64String = reader.result.replace("data:", "")
                     .replace(/^.+,/, "");
-            imageBase64Stringsep = base64String;
+            var imageBase64Stringsep = base64String;
             alert("Your avatar has been uploaded!");
 
-               stompClient.publish({
-                destination:"/app/upload",
-                  body:imageBase64Stringsep
-                })
-            }
-            reader.readAsDataURL(file);
-         }
-    </script>
+            stompClient.publish({
+                destination: "/app/upload",
+                body: imageBase64Stringsep
+            })
+        }
+        reader.readAsDataURL(file);
+    }
+</script>
 
 </head>
 <body>
@@ -207,9 +223,11 @@
 <h1 text align="center"> <b id="profileBox"> </b> </h1>
 <h2 text align="center"> <b id="profileAttemptsBox"> </b> </h2>
 <h3 text align="center"> <b id="profile"> LAST PLAY RESULT ******************YOUR MUGSHOT ****************BEST PLAY RESULT</b> </h3>
+
 <div id="controls1">
-    <button id="uploadButton"  type="button" class="buttonUpload" >Upload</button>
+    <button id="uploadButton" type="button" class="buttonUpload">Upload</button>
 </div>
+
 <form id="forms">
     <label class="input-file">
         <input type="file" id="filename" name="file">
@@ -218,21 +236,22 @@
     </label>
 </form>
 
-
-
-<img class="mugShot" src="/getPhoto" alt="" width="120" height="120">
+<!-- Картинки: добавил класс js-url, чтобы скрипт их нашел -->
+<img class="mugShot js-url" data-src="/getPhoto" alt="" width="120" height="120">
 
 <div id="controls2">
-    <button id="startGameButton" disabled type="button" class="buttonStart" >Start</button>
+    <button id="startGameButton" disabled type="button" class="buttonStart">Start</button>
 </div>
 
-<img class="snapShot" src="/getSnapShot" alt="" width="120" height="120">
-<img class="snapShotBest" src="/getSnapShotBest" alt="" width="120" height="120">
+<img class="snapShot js-url" data-src="/getSnapShot" alt="" width="120" height="120">
+<img class="snapShotBest js-url" data-src="/getSnapShotBest" alt="" width="120" height="120">
 
 <audio id="profile_sound">
-    <source  src="http://localhost:8080/sounds/profile.mp3" type="audio/mpeg"></source>
-    <source  src="http://localhost:8080/sounds/profile.ogg" type="audio/ogg"></source>
+    <!-- Источники звука пока пустые, их заполнит скрипт -->
+    <source id="src-mp3" type="audio/mpeg">
+    <source id="src-ogg" type="audio/ogg">
 </audio>
 
 </body>
+
 </html>

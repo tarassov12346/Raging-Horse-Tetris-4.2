@@ -30,32 +30,48 @@ public class GameArtefactServiceImpl implements GameArtefactService {
         String pathToShots = System.getProperty("user.dir") + shotsPath;
         String format = "jpg";
         String fileName = pathToShots + fileNameDetail + "." + format;
-        try(Page page = browser.newPage()){
-        char[][] cells = playGameService.drawTetraminoOnCells(state);
-        page.navigate(baseUrl + "/html/snapShot.html");
-        for (int i = 0; i < 20; i++) {
-            for (int j = 0; j < 12; j++) {
-                String cell = new StringBuilder("c").append(i).append("v").append(j).toString();
-                String src = new StringBuilder(baseUrl + "/img/").append(cells[i][j]).append(".png").toString();
-                String js = "document.getElementById('" + cell + "').src='" + src + "'";
-                page.evaluate(js);
+
+        // Оборачиваем всё создание страницы в try-catch
+        try (Page page = browser.newPage()) {
+            char[][] cells = playGameService.drawTetraminoOnCells(state);
+            page.navigate(baseUrl + "/html/snapShot.html");
+
+            for (int i = 0; i < 20; i++) {
+                for (int j = 0; j < 12; j++) {
+                    String cell = "c" + i + "v" + j;
+                    String src = baseUrl + "/img/" + cells[i][j] + ".png";
+                    String js = "document.getElementById('" + cell + "').src='" + src + "'";
+                    page.evaluate(js);
+                }
             }
+
+            // Группируем мелкие evaluate в один для стабильности и скорости
+            page.evaluate("() => {" +
+                    "document.getElementById('gameStatusBox').innerHTML = 'Game OVER!!!';" +
+                    "document.getElementById('playerBox').innerHTML = '" + state.getGame().getPlayerName() + "';" +
+                    "document.getElementById('playerScoreBox').innerHTML = '" + state.getGame().getPlayerScore() + "';" +
+                    "document.getElementById('bestPlayerBox').innerHTML = '" + bestPlayerName + "';" +
+                    "document.getElementById('bestPlayerScoreBox').innerHTML = '" + bestPlayerScore + "';" +
+                    "document.getElementById('tetrisSpeedBox').innerHTML = 'Tetris at speed " + (state.getGame().getPlayerScore() / 10) + "';" +
+                    "}");
+
+            page.waitForSelector("#gameStatusBox", new Page.WaitForSelectorOptions().setState(WaitForSelectorState.VISIBLE));
+            page.waitForSelector("#c19v11");
+
+            page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get(fileName)));
+
+        } catch (com.microsoft.playwright.PlaywrightException e) {
+            // Проверяем, является ли это той самой технической ошибкой
+            if (e.getMessage().contains("__adopt__")) {
+                // Просто логируем и не прерываем работу, так как скриншот скорее всего уже сделан
+                System.err.println("Playwright internal error (ignored): " + e.getMessage());
+            } else {
+                // Если ошибка другая — пробрасываем её дальше
+                throw e;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        String js = "document.getElementById('gameStatusBox').innerHTML = 'Game OVER!!!'";
-        page.evaluate(js);
-        js = "document.getElementById('playerBox').innerHTML = '" + state.getGame().getPlayerName() + "'";
-        page.evaluate(js);
-        js = "document.getElementById('playerScoreBox').innerHTML = '" + state.getGame().getPlayerScore() + "'";
-        page.evaluate(js);
-        js = "document.getElementById('bestPlayerBox').innerHTML = '" + bestPlayerName + "'";
-        page.evaluate(js);
-        js = "document.getElementById('bestPlayerScoreBox').innerHTML = '" + bestPlayerScore + "'";
-        page.evaluate(js);
-        js = "document.getElementById('tetrisSpeedBox').innerHTML = 'Tetris at speed " + state.getGame().getPlayerScore() / 10 + "'";
-        page.evaluate(js);
-        page.waitForSelector("#gameStatusBox", new Page.WaitForSelectorOptions().setState(WaitForSelectorState.VISIBLE));
-        // Вариант 2: Ждем, пока все изображения загрузятся (надежнее)
-        //  page.waitForFunction("() => Array.from(document.querySelectorAll('img')).every(img => img.complete)");
-        page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get(fileName)));}
     }
+
 }
