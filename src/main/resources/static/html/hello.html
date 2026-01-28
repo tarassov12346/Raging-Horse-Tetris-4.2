@@ -29,7 +29,7 @@
     <script>
         // --- КОНФИГУРАЦИЯ АДРЕСА ---
  //       var BASE_URL = "http://localhost:8080";
-  var BASE_URL = "https://animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
+  var BASE_URL = "http://animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
         // ---------------------------
 
         var stompClient = null;
@@ -59,7 +59,7 @@
         function connect() {
             // Автоматическая замена http на ws для сокетов
   //          var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/websocket";
-var wsUrl = BASE_URL.replace(/^https/, 'wss') + "/websocket";
+var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/websocket";
             stompClient = new window.StompJs.Client({
                 webSocketFactory: function () {
                     return new WebSocket(wsUrl);
