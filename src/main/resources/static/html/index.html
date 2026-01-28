@@ -20,8 +20,8 @@
 
     <script>
 
-    // var BASE_URL = "http://localhost:8080"; // Ваша переменная
-  var BASE_URL = "https://animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
+     var BASE_URL = "http://localhost:8080"; // Ваша переменная
+ // var BASE_URL = "https://animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
         var stompClient = null;
         var score = 0;
 
@@ -70,6 +70,8 @@
         function connect() {
             // Генерируем ws адрес из BASE_URL (заменяет http на ws)
             var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/websocket";
+
+ //var wsUrl = BASE_URL.replace(/^https/, 'wss') + "/websocket";
             stompClient = new window.StompJs.Client({
                 webSocketFactory: function () {
                     return new WebSocket(wsUrl);

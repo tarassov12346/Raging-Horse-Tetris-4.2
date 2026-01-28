@@ -63,10 +63,10 @@
 
     <script>
     // Наша переменная (в 2026 году лучше держать адрес в одном месте)
-  //  var baseUrl = "localhost:8080";
- var baseUrl = "animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
- //   var httpUrl = "http://" + baseUrl;
-var httpUrl = "https://" + baseUrl;
+    var baseUrl = "localhost:8080";
+ //var baseUrl = "animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
+    var httpUrl = "http://" + baseUrl;
+//var httpUrl = "https://" + baseUrl;
 
     var stompClient = null;
 
@@ -105,6 +105,7 @@ var httpUrl = "https://" + baseUrl;
             webSocketFactory: function () {
                 // Используем baseUrl для сокета
                 return new WebSocket("ws://" + baseUrl + "/websocket");
+  // return new WebSocket("wss://" + baseUrl + "/websocket");
             }
         });
 

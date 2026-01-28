@@ -93,10 +93,10 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script>
     // Базовая переменная для адреса сервера
-  //  var baseUrl = "localhost:8080";
-var baseUrl = "animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
-  //  var httpUrl = "http://" + baseUrl;
-var httpUrl = "https://" + baseUrl;
+    var baseUrl = "localhost:8080";
+//var baseUrl = "animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
+    var httpUrl = "http://" + baseUrl;
+//var httpUrl = "https://" + baseUrl;
     var stompClient = null;
 
     setTimeout(connect, 500);
@@ -137,7 +137,7 @@ var httpUrl = "https://" + baseUrl;
     function connect() {
         // Используем baseUrl для WebSocket (добавляем протокол ws://)
         var wb = new WebSocket("ws://" + baseUrl + "/websocket");
-
+//var wb = new WebSocket("wss://" + baseUrl + "/websocket");
         wb.binaryType = "arraybuffer";
 
         stompClient = new window.StompJs.Client({
