@@ -18,79 +18,90 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
     <script>
-        // --- КОНФИГУРАЦИЯ АДРЕСА ---
- //       var BASE_URL = "http://localhost:8080";
- var BASE_URL = "http://animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
-        // ---------------------------
+    // --- УНИВЕРСАЛЬНАЯ КОНФИГУРАЦИЯ ---
+    // window.location.origin сам определит http://localhost:8080 или https://...codespaces...
+    var BASE_URL = window.location.origin;
+    // ---------------------------
 
-        var stompClient = null;
+    var stompClient = null;
 
-        setTimeout(connect, 500);
+    setTimeout(connect, 500);
 
-        function setConnected(connected) {
-            $("#registerButton").prop("disabled", connected);
-            $("#logInButton").prop("disabled", connected);
-        }
+    function setConnected(connected) {
+        $("#registerButton").prop("disabled", !connected); // Исправлена логика disabled
+        $("#logInButton").prop("disabled", !connected);
+    }
 
-        function frameHandler(frame) {
-            setConnected(true);
-            console.log('Connected: ' + frame);
-            stompClient.subscribe('/receive/message', function (message) {
-                playSound('registered_sound');
-                window.alert(message.body);
-            });
-        }
+    function frameHandler(frame) {
+        console.log('Connected: ' + frame);
+        stompClient.subscribe('/receive/message', function (message) {
+            playSound('registered_sound');
+            window.alert(message.body);
+        });
+    }
 
-        function connect() {
-            // Формируем ws адрес из BASE_URL (заменяем http на ws)
-  //          var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/register";
- var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/register";
-            stompClient = new window.StompJs.Client({
-                webSocketFactory: function () {
-                    return new WebSocket(wsUrl);
-                }
-            });
-            stompClient.onConnect = function (frame) {
-                frameHandler(frame)
-                setConnected(false)
-            };
-            stompClient.onWebsocketClose = function () {
-                onSocketClose();
-            };
-            stompClient.activate();
-        }
+    function connect() {
+        // Автоматически выбираем wss для https и ws для http
+        var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        var wsUrl = protocol + "//" + window.location.host + "/register";
 
-        function sendUser() {
-            stompClient.publish({
-                destination:"/app/register",
-                body: JSON.stringify({
-                    'username': $("#username").val(),
-                    'password': $("#password").val(),
-                    'passwordConfirm': $("#passwordConfirm").val()
-                })
-            });
-        }
-
-        $(function () {
-            $("#registerButton").click(function () {
-                sendUser();
-            });
-
-            // Динамически подставляем пути к звукам при загрузке
-            $("#registered_sound source[type='audio/mpeg']").attr("src", BASE_URL + "/sounds/registered.mp3");
-            $("#registered_sound source[type='audio/ogg']").attr("src", BASE_URL + "/sounds/registered.ogg");
-            $("#registered_sound")[0].load(); // Перезагружаем аудио-элемент
+        stompClient = new window.StompJs.Client({
+            webSocketFactory: function () {
+                return new WebSocket(wsUrl);
+            }
         });
 
-        function playSound(id){
-            var audio = document.getElementById(id);
-            audio.play();
-        }
+        stompClient.onConnect = function (frame) {
+            frameHandler(frame);
+            setConnected(true); // Кнопки активны при подключении
+        };
 
-        function logIn() {
-            window.location = BASE_URL + "/html/hello.html";
+        stompClient.onWebSocketClose = function () {
+            setConnected(false);
+            console.log("Socket closed");
+        };
+
+        stompClient.activate();
+    }
+
+    function sendUser() {
+        stompClient.publish({
+            destination:"/app/register",
+            body: JSON.stringify({
+                'username': $("#username").val(),
+                'password': $("#password").val(),
+                'passwordConfirm': $("#passwordConfirm").val()
+            })
+        });
+    }
+
+    $(function () {
+        $("#registerButton").click(function () {
+            sendUser();
+        });
+
+        // Используем относительные пути для звуков — браузер сам добавит домен и правильный протокол
+        $("#registered_sound source[type='audio/mpeg']").attr("src", "/sounds/registered.mp3");
+        $("#registered_sound source[type='audio/ogg']").attr("src", "/sounds/registered.ogg");
+
+        // Исправляем путь к картинке, если она тоже не грузится
+        $(".displayed").attr("src", "/img/black.png");
+    });
+
+    function playSound(id){
+        var audio = document.getElementById(id);
+        if (audio) {
+            audio.load();
+            audio.play().catch(e => console.log("Audio play failed:", e));
         }
-    </script>
+    }
+
+    function logIn() {
+        // Относительный путь для перехода
+        window.location.href = "/html/hello.html";
+    }
+</script>
+
 </head>
 
 <body>

@@ -4,20 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <title>Tetris</title>
-
     <style>
         body {
            font-family: 'Courier New', monospace;
            font-size: 14px;
            background-color: rgb(255, 255, 128);
         }
-
     </style>
-
 </head>
 <body>
-<h1 text align="center"><b id="tetrisSpeedBox"> </b></h1>
-<h2 text align="center"><b id="gameStatusBox"> </b></h2>
+<h1 style="text-align: center;"><b id="tetrisSpeedBox"> </b></h1>
+<h2 style="text-align: center;"><b id="gameStatusBox"> </b></h2>
 
 <table align="center" style="background-color: #ffffff; border:1px black solid;" border="1" width="600">
     <tr>
@@ -39,23 +36,23 @@
 </table>
 
 <script>
-    // Исполняем немедленно, не дожидаясь полной загрузки всех картинок
     (function generateTable() {
- //       var baseUrl = "localhost:8080";
-  var baseUrl ="animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
         var table = document.getElementById("table");
         var html = "";
+
+        // Используем относительный путь '/img/0.png'.
+        // Браузер сам добавит домен и нужный протокол (http или https).
+        var imgPath = "/img/0.png";
+
         for (var r = 0; r < 20; r++) {
             html += "<tr>";
             for (var v = 0; v < 12; v++) {
-//                html += '<td><img id="c' + r + 'v' + v + '" src="http://' + baseUrl + '/img/0.png"></td>';
-   html += '<td><img id="c' + r + 'v' + v + '" src="https://' + baseUrl + '/img/0.png"></td>';
+                html += '<td><img id="c' + r + 'v' + v + '" src="' + imgPath + '"></td>';
             }
             html += "</tr>";
         }
         table.innerHTML = html;
     })();
-
 </script>
 </body>
 </html>

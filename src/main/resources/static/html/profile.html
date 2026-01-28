@@ -92,131 +92,113 @@
     <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script>
-    // Базовая переменная для адреса сервера
- //   var baseUrl = "localhost:8080";
-var baseUrl = "animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
-//    var httpUrl = "http://" + baseUrl;
-var httpUrl = "https://" + baseUrl;
+    // --- УНИВЕРСАЛЬНАЯ КОНФИГУРАЦИЯ ---
+    const BASE_URL = window.location.origin; // Автоматически определит https://...
     var stompClient = null;
 
     setTimeout(connect, 500);
 
     function setConnected(connected) {
-        $("#startGameButton").prop("disabled", connected);
-    }
-
-    function frameHandlerPlayerStat(frame) {
-        setConnected(true);
-        console.log('Connected: ' + frame);
-        stompClient.subscribe('/receive/playerStat', function (game) {
-            showPlayerStat(game.body);
-        });
-    }
-
-    function frameHandlerPlayerAttemptsNumber(frame) {
-        setConnected(true);
-        console.log('Connected: ' + frame);
-        stompClient.subscribe('/receive/playerAttemptsNumber', function (number) {
-            showPlayerAttemptsNumber(number.body);
-        });
-    }
-
-    function showPlayerStat(game) {
-       var jsonGame = JSON.parse(game);
-       var player = jsonGame['playerName'];
-       var score = jsonGame['playerScore'];
-       $("#profileBox").text('Hello ' + player + '!' + ' Your best score is ' + score);
-    }
-
-    function showPlayerAttemptsNumber(game) {
-       var jsonGame = JSON.parse(game);
-       var attempts = jsonGame['playerScore'];
-       $("#profileAttemptsBox").text('You have played ' + attempts + ' times!');
+        // Разблокируем кнопку, когда подключены (!connected -> false)
+        $("#startGameButton").prop("disabled", !connected);
     }
 
     function connect() {
-        // Используем baseUrl для WebSocket (добавляем протокол ws://)
- //       var wb = new WebSocket("ws://" + baseUrl + "/websocket");
-var wb = new WebSocket("wss://" + baseUrl + "/websocket");
+        // Авто-выбор протокола ws/wss
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + "//" + window.location.host + "/websocket";
+
+        const wb = new WebSocket(wsUrl);
         wb.binaryType = "arraybuffer";
 
         stompClient = new window.StompJs.Client({
-            webSocketFactory: function () {
-                return wb;
-            }
+            webSocketFactory: () => wb
         });
 
         stompClient.onConnect = function (frame) {
-            frameHandlerPlayerStat(frame)
-            frameHandlerPlayerAttemptsNumber(frame)
+            console.log('Connected: ' + frame);
 
-            setConnected(false)
+            stompClient.subscribe('/receive/playerStat', (msg) => showPlayerStat(msg.body));
+            stompClient.subscribe('/receive/playerAttemptsNumber', (msg) => showPlayerAttemptsNumber(msg.body));
+
+            setConnected(true);
 
             stompClient.publish({
                 destination: "/app/profile",
                 body: JSON.stringify({ '': '' })
-            })
+            });
         };
 
-        stompClient.onWebsocketClose = function () {
-            onSocketClose();
-        };
+        stompClient.onWebsocketClose = () => setConnected(false);
 
         playSound('profile_sound');
         stompClient.activate();
     }
 
-    function playSound(id) {
-        var audio = document.getElementById(id);
-        audio.play();
+    function showPlayerStat(game) {
+       const json = JSON.parse(game);
+       $("#profileBox").text(`Hello ${json.playerName}! Your best score is ${json.playerScore}`);
+    }
+
+    function showPlayerAttemptsNumber(number) {
+       const json = JSON.parse(number);
+       $("#profileAttemptsBox").text(`You have played ${json.playerScore} times!`);
     }
 
     function index() {
-        // Используем baseUrl для редиректа (добавляем протокол http://)
-        window.location = "http://" + baseUrl + "/html/index.html";
+        // Используем относительный путь для перехода
+        window.location.href = "/html/index.html";
     }
 
     $(function () {
-        // 1. Обновляем пути для картинок
-    $(".js-url").each(function() {
-        var path = $(this).data("src");
-        $(this).attr("src", httpUrl + path);
-    });
+        // Обновляем ресурсы через относительные пути (самый надежный способ)
+        $(".mugShot").attr("src", "/getPhoto");
+        $(".snapShot").attr("src", "/getSnapShot");
+        $(".snapShotBest").attr("src", "/getSnapShotBest");
 
-    // 2. Обновляем пути для аудио
-    $("#src-mp3").attr("src", httpUrl + "/sounds/profile.mp3");
-    $("#src-ogg").attr("src", httpUrl + "/sounds/profile.ogg");
+        $("#src-mp3").attr("src", "/sounds/profile.mp3");
+        $("#src-ogg").attr("src", "/sounds/profile.ogg");
+        $("#profile_sound")[0].load();
 
-    // Загружаем аудио заново, так как пути изменились
-    $("#profile_sound")[0].load();
+        $("#startGameButton").click(index);
+        $("#uploadButton").click(sendFile);
 
-    // Твои старые обработчики кликов
-    $("#startGameButton").click(function () {
-        index();
-    });
-    $("#uploadButton").click(function () {
-       sendFile();
-    });
+        // Косметика: отображение имени файла при выборе
+        $('.input-file input[type=file]').on('change', function() {
+            let file = $(this)[0].files[0];
+            $(this).next().next().html(file.name);
+        });
     });
 
     function sendFile() {
-        var file = document.getElementById('filename').files[0];
-        var base64String = "";
-        var reader = new FileReader();
+        const fileInput = document.getElementById('filename');
+        if (fileInput.files.length === 0) return alert("Please select a file first!");
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
         reader.onload = function () {
-            base64String = reader.result.replace("data:", "")
-                    .replace(/^.+,/, "");
-            var imageBase64Stringsep = base64String;
+            const base64String = reader.result.split(',')[1];
             alert("Your avatar has been uploaded!");
 
             stompClient.publish({
                 destination: "/app/upload",
-                body: imageBase64Stringsep
-            })
+                body: base64String
+            });
+
+            // Сразу пробуем обновить картинку аватара
+            setTimeout(() => {
+                $(".mugShot").attr("src", "/getPhoto?t=" + new Date().getTime());
+            }, 1000);
         }
         reader.readAsDataURL(file);
     }
+
+    function playSound(id) {
+        const audio = document.getElementById(id);
+        if (audio) audio.play().catch(e => console.log("Autoplay blocked"));
+    }
 </script>
+
 
 </head>
 <body>

@@ -62,12 +62,8 @@
 
 
     <script>
-    // Наша переменная (в 2026 году лучше держать адрес в одном месте)
- //   var baseUrl = "localhost:8080";
- var baseUrl = "animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
-  //  var httpUrl = "http://" + baseUrl;
-var httpUrl = "https://" + baseUrl;
-
+    // --- УНИВЕРСАЛЬНАЯ КОНФИГУРАЦИЯ ---
+    const BASE_URL = window.location.origin;
     var stompClient = null;
 
     setTimeout(connect, 500);
@@ -76,118 +72,78 @@ var httpUrl = "https://" + baseUrl;
         $("#profileButton").prop("disabled", !connected);
     }
 
-    function frameHandlerUsers(frame) {
-        setConnected(true);
-        console.log('Connected: ' + frame);
-        stompClient.subscribe('/receive/users', function (users) {
-            showUsers(users.body);
-        });
-    }
-
-    function frameHandlerResults(frame) {
-        setConnected(true);
-        console.log('Connected: ' + frame);
-        stompClient.subscribe('/receive/results', function (game) {
-            showResults(game.body);
-        });
-    }
-
-    function frameHandlerAlerts(frame) {
-        setConnected(true);
-        console.log('Connected: ' + frame);
-        stompClient.subscribe('/receive/alert', function (message) {
-          window.alert(message.body);
-        });
-    }
-
     function connect() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + "//" + window.location.host + "/websocket";
+
         stompClient = new window.StompJs.Client({
-            webSocketFactory: function () {
-                // Используем baseUrl для сокета
-  //              return new WebSocket("ws://" + baseUrl + "/websocket");
-   return new WebSocket("wss://" + baseUrl + "/websocket");
-            }
+            webSocketFactory: () => new WebSocket(wsUrl)
         });
 
         stompClient.onConnect = function (frame) {
-            frameHandlerUsers(frame)
-            frameHandlerResults(frame)
-            frameHandlerAlerts(frame)
-            sendForAdmin()
+            console.log('Connected Admin: ' + frame);
+            stompClient.subscribe('/receive/users', (msg) => showUsers(msg.body));
+            stompClient.subscribe('/receive/results', (msg) => showResults(msg.body));
+            stompClient.subscribe('/receive/alert', (msg) => window.alert(msg.body));
+
+            setConnected(true);
+            sendForAdmin();
         };
-        stompClient.onWebsocketClose = function () {
-            onSocketClose();
-        };
+
+        stompClient.onWebSocketClose = () => setConnected(false);
+
         playSound('admin_sound');
         stompClient.activate();
     }
 
-    function playSound(id) {
-        var audio = document.getElementById(id);
-        audio.play();
-    }
-
     function showUsers(users) {
-        var jsonUser = JSON.parse(users);
-        $("#users").prepend("<tr>" +
-        "<td>" + jsonUser['id'] + "</td>" +
-        "<td>" + jsonUser['username'] + "</td>" +
-        "<td>" + jsonUser['password'] + "</td>" +
-        "<td>" + jsonUser['passwordConfirm'] + "</td>" +
-        "<td>" + "<button onclick='deleteUser(this.textContent.substring(7))'>" +"DELETE "+ jsonUser['id'] + "</button>" + "</td>" +
-        "</tr>");
+        const jsonUser = JSON.parse(users);
+        $("#users").append(`<tr>
+            <td>${jsonUser.id}</td>
+            <td>${jsonUser.username}</td>
+            <td>${jsonUser.password}</td>
+            <td>${jsonUser.passwordConfirm}</td>
+            <td><button class="btn btn-danger" onclick="deleteUser(${jsonUser.id})">DELETE ${jsonUser.id}</button></td>
+        </tr>`);
     }
 
     function deleteUser(id) {
+        if(!confirm("Are you sure?")) return;
         stompClient.publish({
-            destination: "/app/admin" + "/" + id,
+            destination: "/app/admin/" + id,
             body: JSON.stringify({ '': '' })
         });
-        setTimeout(function() {
-            // Используем baseUrl для обновления страницы
-            window.location = "http://" + baseUrl + "/html/admin.html";
-        }, 300);
+        // Используем относительный путь для обновления
+        setTimeout(() => { window.location.href = "/html/admin.html"; }, 300);
     }
 
     function showResults(game) {
-        var jsonGame = JSON.parse(game);
-        $("#results").prepend("<tr>" +
-        "<td>" + jsonGame['id'] + "</td>" +
-        "<td>" + jsonGame['playerName'] + "</td>" +
-        "<td>" + jsonGame['playerScore'] + "</td>" +
-        "</tr>");
+        const jsonGame = JSON.parse(game);
+        $("#results").append(`<tr>
+            <td>${jsonGame.id}</td>
+            <td>${jsonGame.playerName}</td>
+            <td>${jsonGame.playerScore}</td>
+        </tr>`);
     }
 
     function profile() {
-        // Используем baseUrl для перехода в профиль
-        window.location = "http://" + baseUrl + "/html/profile.html";
+        window.location.href = "/html/profile.html";
     }
 
     $(function () {
-         var httpUrl = "http://" + baseUrl;
+        // Относительные пути для аудио
+        $("#admin-mp3").attr("src", "/sounds/admin.mp3");
+        $("#admin-ogg").attr("src", "/sounds/admin.ogg");
+        const audio = document.getElementById("admin_sound");
+        if (audio) audio.load();
 
-    // 1. Обновляем пути для аудио
-    $("#admin-mp3").attr("src", httpUrl + "/sounds/admin.mp3");
-    $("#admin-ogg").attr("src", httpUrl + "/sounds/admin.ogg");
+        // Относительные пути для картинок
+        $(".js-url").each(function() {
+            const path = $(this).data("src");
+            if (path) $(this).attr("src", path);
+        });
 
-    // ИСПОЛЬЗУЕМ НАТИВНЫЙ JS МЕТОД вместо jQuery .load()
-    var audio = document.getElementById("admin_sound");
-    if (audio) {
-        audio.load(); // Это заставит браузер перечитать теги <source>
-    }
-
-    // 2. Обновляем пути для картинок
-    $(".js-url").each(function() {
-        var path = $(this).data("src");
-        if (path) {
-            $(this).attr("src", httpUrl + path);
-        }
-    });
-
-    // 3. Обработчик кнопки
-    $("#profileButton").click(function () {
-        profile();
-    });
+        $("#profileButton").click(profile);
     });
 
     function sendForAdmin() {
@@ -195,6 +151,11 @@ var httpUrl = "https://" + baseUrl;
             destination: "/app/admin",
             body: JSON.stringify({ '': '' })
         });
+    }
+
+    function playSound(id) {
+        const audio = document.getElementById(id);
+        if (audio) audio.play().catch(e => console.log("Autoplay blocked"));
     }
 </script>
 

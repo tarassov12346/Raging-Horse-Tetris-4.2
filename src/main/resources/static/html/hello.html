@@ -27,127 +27,110 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
     <script>
-        // --- КОНФИГУРАЦИЯ АДРЕСА ---
- //       var BASE_URL = "http://localhost:8080";
-  var BASE_URL = "http://animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
-        // ---------------------------
+    // --- УНИВЕРСАЛЬНАЯ КОНФИГУРАЦИЯ ---
+    // Определяем корень сайта автоматически
+    var BASE_URL = window.location.origin;
+    // ---------------------------
 
-        var stompClient = null;
+    var stompClient = null;
 
-        setTimeout(connect, 500);
+    setTimeout(connect, 500);
 
-        function setConnected(connected) {
-            $("#startGameButton").prop("disabled", connected);
-            $("#adminButton").prop("disabled", connected);
-            $("#profileButton").prop("disabled", connected);
-        }
+    function setConnected(connected) {
+        // Чтобы кнопки РАБОТАЛИ (не были disabled), передаем false в prop("disabled")
+        $("#startGameButton").prop("disabled", !connected);
+        $("#adminButton").prop("disabled", !connected);
+        $("#profileButton").prop("disabled", !connected);
+    }
 
-        function frameHandlerDaoGame(frame) {
-            setConnected(true);
-            console.log('Connected: ' + frame);
-            stompClient.subscribe('/receive/daoGameObjects', function (daoGame) {
-                showDaoGame(daoGame.body);
-            });
-        }
+    function frameHandlerDaoGame(frame) {
+        console.log('Connected (Dao): ' + frame);
+        stompClient.subscribe('/receive/daoGameObjects', function (daoGame) {
+            showDaoGame(daoGame.body);
+        });
+    }
 
-        function frameHandlerGame(frame) {
-            stompClient.subscribe('/receive/gameObjects', function (game) {
-                showGame(game.body);
-            });
-        }
+    function frameHandlerGame(frame) {
+        stompClient.subscribe('/receive/gameObjects', function (game) {
+            showGame(game.body);
+        });
+    }
 
-        function connect() {
-            // Автоматическая замена http на ws для сокетов
-  //          var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/websocket";
-var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/websocket";
-            stompClient = new window.StompJs.Client({
-                webSocketFactory: function () {
-                    return new WebSocket(wsUrl);
-                }
-            });
-            stompClient.onConnect = function (frame) {
-                frameHandlerDaoGame(frame)
-                frameHandlerGame(frame)
-                setConnected(false)
+    function connect() {
+        // Автоматический выбор ws/wss в зависимости от того, как открыт сайт
+        var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        var wsUrl = protocol + "//" + window.location.host + "/websocket";
 
-                stompClient.publish({
-                    destination:"/app/hello",
-                    body: JSON.stringify({ '': '' })
-                })
-            };
-
-            stompClient.onWebsocketClose = function () {
-                onSocketClose();
-            };
-
-            playSound('hello_sound');
-            stompClient.activate();
-        }
-
-        function index() {
-            window.location = BASE_URL + "/html/index.html";
-        }
-
-        function admin() {
-            window.location = BASE_URL + "/html/admin.html";
-        }
-
-        function profile() {
-            window.location = BASE_URL + "/html/profile.html";
-        }
-
-        function showDaoGame(game) {
-           var jsonDaoGame = JSON.parse(game);
-           var bestPlayer = jsonDaoGame['playerName'];
-           var bestScore = jsonDaoGame['playerScore'];
-            $("#bestPlayerBox").text('Wanna challenge the best player '+bestPlayer);
-            $("#bestScoreBox").text('with his score '+bestScore+'?');
-        }
-
-        function showGame(game) {
-           var jsonGame = JSON.parse(game);
-           var playerName = jsonGame['playerName'];
-             $("#helloBox").text('Hello ' + playerName + '! WELCOME TO RAGING HORSE TETRIS!');
-        }
-
-        $(function () {
-            // Динамическая подстановка адресов звуков
-            $("#hello_sound source[type='audio/mpeg']").attr("src", BASE_URL + "/sounds/hello.mp3");
-            $("#hello_sound source[type='audio/ogg']").attr("src", BASE_URL + "/sounds/hello.ogg");
-            $("#hello_sound").get(0).load();
-
-            $("#startGameButton").click(function () {
-                index();
-            });
-
-            $("#adminButton").click(function () {
-                admin();
-            });
-
-            $("#profileButton").click(function () {
-                profile();
-            });
+        stompClient = new window.StompJs.Client({
+            webSocketFactory: function () {
+                return new WebSocket(wsUrl);
+            }
         });
 
-        function playSound(id){
-          var audio = document.getElementById(id);
-          if (!audio) return;
+        stompClient.onConnect = function (frame) {
+            frameHandlerDaoGame(frame);
+            frameHandlerGame(frame);
+            setConnected(true); // Соединение есть — кнопки активны
 
-          if (id == 'snap_sound') {
-             if (typeof audio.loop == 'boolean') {
-                 audio.loop = true;
-             } else {
-                  audio.addEventListener('ended', function() {
-                      this.currentTime = 0;
-                      this.play();
-                  }, false);
-             }
-          }
-          audio.play().catch(function(e) {
-              console.log("Autoplay blocked or audio not loaded yet");
-          });
-        }
-    </script>
+            stompClient.publish({
+                destination:"/app/hello",
+                body: JSON.stringify({ '': '' })
+            });
+        };
+
+        stompClient.onWebsocketClose = function () {
+            setConnected(false);
+            console.log("WebSocket closed");
+        };
+
+        playSound('hello_sound');
+        stompClient.activate();
+    }
+
+    // Используем относительные пути для переходов
+    function index() { window.location.href = "/html/index.html"; }
+    function admin() { window.location.href = "/html/admin.html"; }
+    function profile() { window.location.href = "/html/profile.html"; }
+
+    function showDaoGame(game) {
+       var jsonDaoGame = JSON.parse(game);
+       var bestPlayer = jsonDaoGame['playerName'];
+       var bestScore = jsonDaoGame['playerScore'];
+        $("#bestPlayerBox").text('Wanna challenge the best player ' + bestPlayer);
+        $("#bestScoreBox").text('with his score ' + bestScore + '?');
+    }
+
+    function showGame(game) {
+       var jsonGame = JSON.parse(game);
+       var playerName = jsonGame['playerName'];
+       $("#helloBox").text('Hello ' + playerName + '! WELCOME TO RAGING HORSE TETRIS!');
+    }
+
+    $(function () {
+        // Относительные пути для ресурсов (звуков и картинок)
+        $("#hello_sound source[type='audio/mpeg']").attr("src", "/sounds/hello.mp3");
+        $("#hello_sound source[type='audio/ogg']").attr("src", "/sounds/hello.ogg");
+        $("#hello_sound").get(0).load();
+
+        // Картинки тоже лучше подстраховать относительным путем
+        $(".displayed").attr("src", "/img/black.png");
+        $(".raging").attr("src", "/img/raging.jpg");
+
+        $("#startGameButton").click(index);
+        $("#adminButton").click(admin);
+        $("#profileButton").click(profile);
+    });
+
+    function playSound(id){
+        var audio = document.getElementById(id);
+        if (!audio) return;
+
+        audio.play().catch(function(e) {
+            console.log("Autoplay blocked: " + e);
+        });
+    }
+</script>
+
 </head>
 <body>
 

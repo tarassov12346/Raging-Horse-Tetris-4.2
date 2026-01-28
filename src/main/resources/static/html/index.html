@@ -19,315 +19,169 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
     <script>
+    // --- УНИВЕРСАЛЬНАЯ КОНФИГУРАЦИЯ ---
+    var BASE_URL = window.location.origin;
+    // ---------------------------
 
- //    var BASE_URL = "http://localhost:8080"; // Ваша переменная
-  var BASE_URL = "https://animated-space-fiesta-49rpjqwg9px2jp57-8080.app.github.dev";
-        var stompClient = null;
-        var score = 0;
+    var stompClient = null;
+    var score = 0;
 
-       setTimeout(connect,500);
+    setTimeout(connect, 500);
 
-        function setConnected(connected) {
-            $("#leftButton").prop("disabled", connected);
-            $("#rightButton").prop("disabled", connected);
-            $("#rotateButton").prop("disabled", connected);
-            $("#dropButton").prop("disabled", connected);
-            $("#newGameButton").prop("disabled", connected);
-            $("#saveButton").prop("disabled", connected);
-            $("#restartButton").prop("disabled", connected);
-        }
-
-        function frameHandlerState(frame) {
-            setConnected(true);
-            console.log('Connected: ' + frame);
-            stompClient.subscribe('/receive/stateObjects', function (state) {
-                showState(state.body);
-            });
-        }
-
-        function frameHandlerFinalState(frame) {
-            setConnected(true);
-            console.log('Connected: ' + frame);
-            stompClient.subscribe('/receive/stateFinal', function (state) {
-                showFinalState(state.body);
-            });
-        }
-
-        function frameHandlerSavedState(frame) {
-            setConnected(true);
-            console.log('Connected: ' + frame);
-            stompClient.subscribe('/receive/stateSaved', function (state) {
-                showSavedState(state.body);
-            });
-        }
-
-        function frameHandlerDaoGame(frame) {
-             stompClient.subscribe('/receive/daoGameObjects', function (game) {
-                showDaoGame(game.body);
-            });
-        }
-
-        function connect() {
-            // Генерируем ws адрес из BASE_URL (заменяет http на ws)
-    //        var wsUrl = BASE_URL.replace(/^http/, 'ws') + "/websocket";
-
- var wsUrl = BASE_URL.replace(/^https/, 'wss') + "/websocket";
-            stompClient = new window.StompJs.Client({
-                webSocketFactory: function () {
-                    return new WebSocket(wsUrl);
-                }
-            });
-            stompClient.onConnect = function (frame) {
-                frameHandlerState(frame);
-                frameHandlerFinalState(frame);
-                frameHandlerDaoGame(frame);
-                frameHandlerSavedState(frame);
-                setConnected(false);
-                stompClient.publish({
-                    destination: "/app/start",
-                    body: JSON.stringify({
-                        '': ''
-                    })
-                });
-            };
-            stompClient.onWebsocketClose = function () {
-                if (typeof onSocketClose === "function") onSocketClose();
-            };
-            playSound('snap_sound');
-            stompClient.activate();
-        }
-
-        function start() {
-            stompClient.publish({
-                destination:"/app/start",
-                body: JSON.stringify({
-                  '': ''
-                })
-            });
-        }
-
-        function save() {
-            stompClient.publish({
-                destination:"/app/save",
-                body: JSON.stringify({
-                  '': ''
-                })
-            });
-        }
-
-        function restart() {
-            stompClient.publish({
-                destination:"/app/restart",
-                body: JSON.stringify({
-                  '': ''
-                })
-            });
-        }
-
-        function showSavedState(state) {
-            var jsonState = JSON.parse(state);
-            var matrix = jsonState['stage']['cells'];
-            var speed = score/10+1;
-            var status = jsonState['running'];
-            if (jsonState['game']['playerScore']> score) {
-                score = jsonState['game']['playerScore'];
-            }
-            $("#playerBox").text(jsonState['game']['playerName']);
-            $("#playerScoreBox").text(score);
-            $("#tetrisSpeedBox").text('TETRIS at speed ' + speed);
-
-            $("#gameStatusBox").text('Game is Saved!!!');
-            playSound('registered_sound');
-
-            for (let i = 0; i < 20; i++) {
-                for (let j = 0; j < 12; j++) {
-                      // ЗАМЕНА: используем BASE_URL вместо localhost
-                      $("#c"+i+"v"+j).attr("src", BASE_URL + "/img/" + matrix[i][j] + ".png");
-                }
-            }
-            $("#leftButton").prop("disabled", true);
-            $("#rightButton").prop("disabled", true);
-            $("#rotateButton").prop("disabled", true);
-            $("#dropButton").prop("disabled", true);
-            $("#saveButton").prop("disabled", true);
-            $("#restartButton").prop("disabled", true);
-            $("#newGameButton").prop("disabled", false);
-        }
-
-        function showFinalState(state) {
-            var jsonState = JSON.parse(state);
-            var matrix = jsonState['stage']['cells'];
-            var speed = score/10+1;
-            var status = jsonState['running'];
-            if (jsonState['game']['playerScore']> score) {
-                score = jsonState['game']['playerScore'];
-            }
-            $("#playerBox").text(jsonState['game']['playerName']);
-            $("#playerScoreBox").text(score);
-            $("#tetrisSpeedBox").text('TETRIS at speed ' + speed);
-            if (status) {
-                $("#gameStatusBox").text('Game status: ON');
-            } else {
-                $("#gameStatusBox").text('Game status: OVER');
-                playSound('registered_sound');
-            }
-            for (let i = 0; i < 20; i++) {
-                for (let j = 0; j < 12; j++) {
-                    // ЗАМЕНА: подставляем BASE_URL для картинок блоков
-                    $("#c"+i+"v"+j).attr("src", BASE_URL + "/img/" + matrix[i][j] + ".png");
-                }
-            }
-            $("#leftButton").prop("disabled", true);
-            $("#rightButton").prop("disabled", true);
-            $("#rotateButton").prop("disabled", true);
-            $("#dropButton").prop("disabled", true);
-            $("#saveButton").prop("disabled", true);
-            $("#restartButton").prop("disabled", true);
-            $("#newGameButton").prop("disabled", false);
-        }
-
-       function showState(state) {
-            var jsonState = JSON.parse(state);
-            var matrix = jsonState['stage']['cells'];
-            var speed = score/10+1;
-            var status = jsonState['running'];
-            if (jsonState['game']['playerScore']> score) {
-                playSound('score_sound');
-                score = jsonState['game']['playerScore'];
-            }
-            else { playSound('game_sound'); }
-            $("#playerBox").text(jsonState['game']['playerName']);
-            $("#playerScoreBox").text(score);
-            $("#tetrisSpeedBox").text('TETRIS at speed ' + speed);
-            if (status) {
-                $("#gameStatusBox").text('Game status: ON');
-            } else {
-                $("#gameStatusBox").text('Game status: PLS WAIT!!!');
-                $("#leftButton").prop("disabled", true);
-                $("#rightButton").prop("disabled", true);
-                $("#rotateButton").prop("disabled", true);
-                $("#dropButton").prop("disabled", true);
-                $("#newGameButton").prop("disabled", true);
-                $("#saveButton").prop("disabled", true);
-                $("#restartButton").prop("disabled", true);
-
-                playSound('registered_sound');
-            }
-            for (let i = 0; i < 20; i++) {
-                for (let j = 0; j < 12; j++) {
-                      // ЗАМЕНА: подставляем BASE_URL для отрисовки активной игры
-                      $("#c"+i+"v"+j).attr("src", BASE_URL + "/img/" + matrix[i][j] + ".png");
-                }
-            }
-            if (!status) snapShot();
-       }
-
-        function snapShot() {
-            stompClient.publish({
-                destination:"/app/snapShot",
-                body: JSON.stringify({
-                  '': ''
-                })
-            });
-        }
-
-        function showDaoGame(game) {
-           var jsonDaoGame = JSON.parse(game);
-           var bestPlayer = jsonDaoGame['playerName'];
-           var bestScore = jsonDaoGame['playerScore'];
-            $("#bestPlayerBox").text(bestPlayer);
-            $("#bestPlayerScoreBox").text(bestScore);
-        }
-
-$(function() {
-    var rows = 20;
-    var cols = 12;
-    var tableHtml = "";
-
-    // Генерируем сетку
-    for (var i = 0; i < rows; i++) {
-        tableHtml += "<tr>";
-        for (var j = 0; j < cols; j++) {
-            tableHtml += '<td><img id="c' + i + 'v' + j + '" src="' + BASE_URL + '/img/0.png"></td>';
-        }
-        tableHtml += "</tr>";
+    function setConnected(connected) {
+        // Кнопки активны, когда connected = true
+        $("#leftButton, #rightButton, #rotateButton, #dropButton, #newGameButton, #saveButton, #restartButton")
+            .prop("disabled", !connected);
     }
-    $("#table").html(tableHtml);
 
-    // Функция для аудио
-    function setAudioSrc(id, fileName) {
-        var $audio = $("#" + id);
-        if ($audio.length) {
-            $audio.find("source[type='audio/mpeg']").attr("src", BASE_URL + "/sounds/" + fileName + ".mp3");
-            $audio.find("source[type='audio/ogg']").attr("src", BASE_URL + "/sounds/" + fileName + ".ogg");
-            $audio[0].load();
+    function connect() {
+        var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        var wsUrl = protocol + "//" + window.location.host + "/websocket";
+
+        stompClient = new window.StompJs.Client({
+            webSocketFactory: function () {
+                return new WebSocket(wsUrl);
+            }
+        });
+
+        stompClient.onConnect = function (frame) {
+            console.log('Connected: ' + frame);
+
+            stompClient.subscribe('/receive/stateObjects', (s) => showState(s.body));
+            stompClient.subscribe('/receive/stateFinal', (s) => showFinalState(s.body));
+            stompClient.subscribe('/receive/stateSaved', (s) => showSavedState(s.body));
+            stompClient.subscribe('/receive/daoGameObjects', (s) => showDaoGame(s.body));
+
+            setConnected(true);
+
+            stompClient.publish({
+                destination: "/app/start",
+                body: JSON.stringify({ '': '' })
+            });
+        };
+
+        stompClient.onWebSocketClose = () => setConnected(false);
+
+        playSound('snap_sound');
+        stompClient.activate();
+    }
+
+    // Общая функция отрисовки матрицы
+    function updateMatrix(matrix) {
+        for (let i = 0; i < 20; i++) {
+            for (let j = 0; j < 12; j++) {
+                // Используем относительный путь для картинок
+                $("#c" + i + "v" + j).attr("src", "/img/" + matrix[i][j] + ".png");
+            }
         }
     }
 
-    setAudioSrc("game_sound", "0");
-    setAudioSrc("score_sound", "score");
-    setAudioSrc("snap_sound", "snap");
-    setAudioSrc("registered_sound", "registered");
+    function showState(state) {
+        var json = JSON.parse(state);
+        var status = json['running'];
 
-    // Обработчики кнопок
-    $("#newGameButton").click(function() {
-        hello();
-        window.location = BASE_URL + "/html/profile.html";
-    });
-    $("#leftButton").click(function() { left(); });
-    $("#rightButton").click(function() { right(); });
-    $("#rotateButton").click(function() { rotate(); });
-    $("#dropButton").click(function() { drop(); });
-    $("#saveButton").click(function() { save(); });
-    $("#restartButton").click(function() { restart(); });
-});
-
-// Функции отправки сообщений (Stomp)
-function hello() {
-    stompClient.publish({ destination: "/app/hello", body: JSON.stringify({ '': '' }) });
-}
-
-function rotate() {
-    stompClient.publish({ destination: "/app/1", body: JSON.stringify({ '': '' }) });
-}
-
-function left() {
-    stompClient.publish({ destination: "/app/2", body: JSON.stringify({ '': '' }) });
-}
-
-function right() {
-    stompClient.publish({ destination: "/app/3", body: JSON.stringify({ '': '' }) });
-}
-
-function drop() {
-    stompClient.publish({ destination: "/app/4", body: JSON.stringify({ '': '' }) });
-}
-
-function playSound(id) {
-    var audio = document.getElementById(id);
-    if (!audio) return;
-    if (id == 'snap_sound') {
-        if (typeof audio.loop == 'boolean') {
-            audio.loop = true;
+        if (json['game']['playerScore'] > score) {
+            playSound('score_sound');
+            score = json['game']['playerScore'];
         } else {
-            audio.addEventListener('ended', function() {
-                this.currentTime = 0;
-                this.play();
-            }, false);
+            playSound('game_sound');
+        }
+
+        $("#playerBox").text(json['game']['playerName']);
+        $("#playerScoreBox").text(score);
+        $("#tetrisSpeedBox").text('TETRIS at speed ' + (score/10 + 1));
+
+        if (status) {
+            $("#gameStatusBox").text('Game status: ON');
+            updateMatrix(json['stage']['cells']);
+        } else {
+            $("#gameStatusBox").text('Game status: PLS WAIT!!!');
+            setConnected(false);
+            playSound('registered_sound');
+            snapShot();
         }
     }
-    audio.play();
-}
 
-// Управление клавишами
-document.onkeydown = function(e) {
-    if (e.keyCode == 37) left();
-    if (e.keyCode == 39) right();
-    if (e.keyCode == 40) drop();
-    if (e.keyCode == 38) rotate();
-};
+    function showFinalState(state) {
+        var json = JSON.parse(state);
+        $("#gameStatusBox").text('Game status: OVER');
+        updateMatrix(json['stage']['cells']);
+        $("#newGameButton").prop("disabled", false);
+        playSound('registered_sound');
+    }
 
+    function showSavedState(state) {
+        var json = JSON.parse(state);
+        $("#gameStatusBox").text('Game is Saved!!!');
+        updateMatrix(json['stage']['cells']);
+        playSound('registered_sound');
+    }
+
+    function showDaoGame(game) {
+        var json = JSON.parse(game);
+        $("#bestPlayerBox").text(json['playerName']);
+        $("#bestPlayerScoreBox").text(json['playerScore']);
+    }
+
+    $(function() {
+        // Генерация сетки через относительные пути
+        var tableHtml = "";
+        for (var i = 0; i < 20; i++) {
+            tableHtml += "<tr>";
+            for (var j = 0; j < 12; j++) {
+                tableHtml += '<td><img id="c' + i + 'v' + j + '" src="/img/0.png"></td>';
+            }
+            tableHtml += "</tr>";
+        }
+        $("#table").html(tableHtml);
+
+        // Настройка звуков через относительные пути
+        const sounds = ['game_sound', 'score_sound', 'snap_sound', 'registered_sound'];
+        const files = ['0', 'score', 'snap', 'registered'];
+
+        sounds.forEach((id, idx) => {
+            var $a = $("#" + id);
+            $a.find("source[type='audio/mpeg']").attr("src", "/sounds/" + files[idx] + ".mp3");
+            $a.find("source[type='audio/ogg']").attr("src", "/sounds/" + files[idx] + ".ogg");
+            $a[0].load();
+        });
+
+        // Кнопки
+        $("#newGameButton").click(() => {
+            stompClient.publish({ destination: "/app/hello", body: JSON.stringify({ '': '' }) });
+            window.location.href = "/html/profile.html";
+        });
+
+        $("#leftButton").click(left);
+        $("#rightButton").click(right);
+        $("#rotateButton").click(rotate);
+        $("#dropButton").click(drop);
+        $("#saveButton").click(save);
+        $("#restartButton").click(restart);
+    });
+
+    // Управление
+    function left() { stompClient.publish({ destination: "/app/2", body: "{}" }); }
+    function right() { stompClient.publish({ destination: "/app/3", body: "{}" }); }
+    function rotate() { stompClient.publish({ destination: "/app/1", body: "{}" }); }
+    function drop() { stompClient.publish({ destination: "/app/4", body: "{}" }); }
+    function save() { stompClient.publish({ destination: "/app/save", body: "{}" }); }
+    function restart() { stompClient.publish({ destination: "/app/restart", body: "{}" }); }
+    function snapShot() { stompClient.publish({ destination: "/app/snapShot", body: "{}" }); }
+
+    function playSound(id) {
+        var audio = document.getElementById(id);
+        if (audio) audio.play().catch(() => {});
+    }
+
+    document.onkeydown = function(e) {
+        if (e.keyCode == 37) left();
+        if (e.keyCode == 39) right();
+        if (e.keyCode == 40) drop();
+        if (e.keyCode == 38) rotate();
+    };
 </script>
+
 </head>
 <body>
 
