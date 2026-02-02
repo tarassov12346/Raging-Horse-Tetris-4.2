@@ -108,9 +108,10 @@
 
     $(function () {
         // Относительные пути для ресурсов (звуков и картинок)
-        $("#hello_sound source[type='audio/mpeg']").attr("src", "/sounds/hello.mp3");
-        $("#hello_sound source[type='audio/ogg']").attr("src", "/sounds/hello.ogg");
-        $("#hello_sound").get(0).load();
+       $("#src-hello-mp3").attr("src", "/sounds/hello.mp3");
+       $("#src-hello-ogg").attr("src", "/sounds/hello.ogg");
+       $("#hello_sound")[0].load();
+
 
         // Картинки тоже лучше подстраховать относительным путем
         $(".displayed").attr("src", "/img/black.png");
@@ -147,9 +148,10 @@
 </div>
 
 <audio id="hello_sound">
-    <source type="audio/mpeg"></source>
-    <source type="audio/ogg"></source>
+    <source id="src-hello-mp3" type="audio/mpeg">
+    <source id="src-hello-ogg" type="audio/ogg">
 </audio>
+
 
 </body>
 </html>
