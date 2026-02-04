@@ -24,9 +24,9 @@ public class GameArtefactServiceImpl implements GameArtefactService {
         this.browser = browser;
         this.baseUrl = baseUrl;
     }
-
+    //Многопоточность здесь берется из самой архитектуры Spring WebSocket (STOMP)
     @Override
-    public void makeDesktopSnapshot(String fileNameDetail, PlayGameService playGameService, State state, String bestPlayerName, int bestPlayerScore) {
+    public synchronized void makeDesktopSnapshot(String fileNameDetail, PlayGameService playGameService, State state, String bestPlayerName, int bestPlayerScore) {
         String pathToShots = System.getProperty("user.dir") + shotsPath;
         String format = "jpg";
         String fileName = pathToShots + fileNameDetail + "." + format;
