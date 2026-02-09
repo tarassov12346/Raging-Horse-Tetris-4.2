@@ -30,17 +30,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        /*
-         * This configures a STOMP (Simple Text Oriented Messaging Protocol)
-         * endpoint for our websocket to be hosted on
-         */
-        registry.addEndpoint("/websocket");
-        registry.addEndpoint("/register");
-        /*
-         * This configures an endpoint with a fallback for SockJS in case the
-         * client (an old browser) doesn't support WebSockets natively
-         */
+        registry.addEndpoint("/websocket")
+                .setAllowedOriginPatterns("*"); // <-- Добавить это
+
+        registry.addEndpoint("/register")
+                .setAllowedOriginPatterns("*"); // <-- И это
+
         registry.addEndpoint("/sockjs")
+                .setAllowedOriginPatterns("*") // <-- И сюда
                 .withSockJS();
     }
 }
