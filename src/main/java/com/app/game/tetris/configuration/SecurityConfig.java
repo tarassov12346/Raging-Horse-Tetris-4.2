@@ -29,7 +29,7 @@ public class SecurityConfig {
                         // Разрешаем статику (картинки, звуки) и регистрацию всем
                         .requestMatchers("/img/**", "/sounds/**", "/register/**", "/html/registration.html").permitAll()
                         // Разрешаем главные страницы, но Spring будет знать, кто на них зашел
-                        .requestMatchers("/html/index.html", "/html/snapShot.html").permitAll()
+                        .requestMatchers("/", "/html/index.html", "/html/snapShot.html").permitAll()
                         // Всё остальное (например, админка или старт игры) — только после входа
                         .anyRequest().authenticated()
                 )

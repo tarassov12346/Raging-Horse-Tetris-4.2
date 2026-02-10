@@ -48,6 +48,11 @@ public class TetrisController {
         this.displayService = displayService;
     }
 
+    @GetMapping("/")
+    public String redirectToRegistration() {
+        return "redirect:/html/registration.html";
+    }
+
     @MessageMapping("/register")
     public void register(@Valid UserRegistrationDto userDto) {
         if (usersService.isRolesDBEmpty()) {
