@@ -1,0 +1,35 @@
+hazelcast:
+  cluster-name: raging-horse-tetris-cluster
+
+  # Настройки сети для объединения узлов в кластер
+  network:
+    port:
+      auto-increment: true
+      port: 5701
+    join:
+      multicast:
+        enabled: true
+      # Если планируешь деплой в Docker/Kubernetes, позже добавим сюда настройки tcp-ip
+
+  # Описание твоих распределенных мап
+  map:
+    user-states:
+      # Резервное копирование: если один сервис упадет, данные выживут на втором
+      backup-count: 1
+
+      # Время жизни данных (в секундах). 1800 сек = 30 минут.
+      # Если игрок не активен, Hazelcast сам почистит память.
+      time-to-live-seconds: 1800
+
+      # Формат хранения в памяти. OBJECT лучше всего подходит для частого чтения.
+      in-memory-format: OBJECT
+
+      # Near Cache — обязателен для Тетриса (ускоряет чтение в 10-100 раз)
+      near-cache:
+        name: user-states-cache
+        invalidate-on-change: true
+        in-memory-format: OBJECT
+        eviction:
+          eviction-policy: LRU
+          max-size-policy: ENTRY_COUNT
+          size: 5000

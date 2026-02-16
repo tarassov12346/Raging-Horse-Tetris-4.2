@@ -48,6 +48,13 @@
 		</dependency>
 
 
+		<dependency>
+			<groupId>com.hazelcast</groupId>
+			<artifactId>hazelcast-spring</artifactId>
+		</dependency>
+
+
+
 
 		<dependency>
 			<groupId>com.microsoft.playwright</groupId>

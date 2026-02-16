@@ -3,6 +3,8 @@ package com.app.game.tetris.tetriserviceImpl;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.*;
 import com.app.game.tetris.tetriservice.PlayGameService;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.map.IMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +17,14 @@ import java.util.stream.IntStream;
 public class PlayGame implements PlayGameService {
     @Value("${width}") int WIDTH;
     @Value("${height}") int HEIGHT;
-    private final ConcurrentHashMap<String, State> userStates = new ConcurrentHashMap<>();
+
+    // Hazelcast Map для состояний
+    private final IMap<String, State> userStates;
+    // Инжектим HazelcastInstance через конструктор
+    public PlayGame(HazelcastInstance hazelcastInstance) {
+        this.userStates = hazelcastInstance.getMap("user-states");
+    }
+
     private final ConcurrentHashMap<String, ScheduledExecutorService> userExecutors = new ConcurrentHashMap<>();
 
     public void removeStateForUser(String userId) {
