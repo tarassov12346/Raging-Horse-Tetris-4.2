@@ -1,16 +1,77 @@
 <!DOCTYPE html>
-<html lang="en" >
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>REGISTRATION</title>
-
+    <title>Registration - Tetris</title>
     <style>
         body {
             font-family: 'Courier New', monospace;
-            font-size: 25px;
             background-color: rgb(100, 100, 100);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            text-align: center;
         }
-        #registration{text-align: center;}
+
+        #registration {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-width: 450px;
+            width: 100%;
+        }
+
+        h2 { margin-bottom: 30px; letter-spacing: 2px; }
+
+        /* Стилизация полей ввода */
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label { display: block; font-size: 16px; margin-bottom: 5px; }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 18px;
+            box-sizing: border-box; /* Чтобы padding не раздувал ширину */
+        }
+
+        input:focus { outline: 3px solid #419152; }
+
+        /* Кнопки */
+        .btn-reg {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+
+        #registerButton { background-color: #419152; color: white; }
+        #logInButton { background-color: #333; color: white; margin-top: 15px; }
+
+        .btn-reg:disabled { background-color: #555 !important; cursor: not-allowed; opacity: 0.6; }
+        .btn-reg:hover:not(:disabled) { filter: brightness(1.2); transform: translateY(-2px); }
+
+        img.displayed {
+            margin-top: 30px;
+            border: 2px solid #000;
+            max-width: 180px;
+            height: auto;
+        }
     </style>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
@@ -18,55 +79,37 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
     <script>
-    // --- УНИВЕРСАЛЬНАЯ КОНФИГУРАЦИЯ ---
-    // window.location.origin сам определит http://localhost:8080 или https://...codespaces...
-    var BASE_URL = window.location.origin;
-    // ---------------------------
-
     var stompClient = null;
 
     setTimeout(connect, 500);
 
     function setConnected(connected) {
-        $("#registerButton").prop("disabled", !connected); // Исправлена логика disabled
-        $("#logInButton").prop("disabled", !connected);
-    }
-
-    function frameHandler(frame) {
-        console.log('Connected: ' + frame);
-        stompClient.subscribe('/receive/message', function (message) {
-            playSound('registered_sound');
-            window.alert(message.body);
-        });
+        $("#registerButton, #logInButton").prop("disabled", !connected);
     }
 
     function connect() {
-        // Автоматически выбираем wss для https и ws для http
         var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         var wsUrl = protocol + "//" + window.location.host + "/register";
 
         stompClient = new window.StompJs.Client({
-            webSocketFactory: function () {
-                return new WebSocket(wsUrl);
-            }
+            webSocketFactory: () => new WebSocket(wsUrl)
         });
 
         stompClient.onConnect = function (frame) {
-            frameHandler(frame);
-            setConnected(true); // Кнопки активны при подключении
+            stompClient.subscribe('/receive/message', function (message) {
+                playSound('registered_sound');
+                window.alert(message.body);
+            });
+            setConnected(true);
         };
 
-        stompClient.onWebSocketClose = function () {
-            setConnected(false);
-            console.log("Socket closed");
-        };
-
+        stompClient.onWebSocketClose = () => setConnected(false);
         stompClient.activate();
     }
 
     function sendUser() {
         stompClient.publish({
-            destination:"/app/register",
+            destination: "/app/register",
             body: JSON.stringify({
                 'username': $("#username").val(),
                 'password': $("#password").val(),
@@ -76,56 +119,45 @@
     }
 
     $(function () {
-        $("#registerButton").click(function () {
-            sendUser();
-        });
-
-        // Используем относительные пути для звуков — браузер сам добавит домен и правильный протокол
-        $("#registered_sound source[type='audio/mpeg']").attr("src", "/sounds/registered.mp3");
-        $("#registered_sound source[type='audio/ogg']").attr("src", "/sounds/registered.ogg");
-
-        // Исправляем путь к картинке, если она тоже не грузится
-        $(".displayed").attr("src", "/img/black.png");
+        $("#registerButton").click(sendUser);
     });
 
-    function playSound(id){
-        var audio = document.getElementById(id);
-        if (audio) {
-            audio.load();
-            audio.play().catch(e => console.log("Audio play failed:", e));
-        }
-    }
+    function logIn() { window.location.href = "/html/hello.html"; }
 
-    function logIn() {
-        // Относительный путь для перехода
-        window.location.href = "/html/hello.html";
+    function playSound(id) {
+        var audio = document.getElementById(id);
+        if (audio) audio.play().catch(() => {});
     }
 </script>
-
 </head>
 
 <body>
 
 <div id="registration">
-    <h2>REGISTRATION FORM</h2>
-    <p>New users name: <input type="text" id="username"></p>
-    <p>New users password: <input type="password" id="password"></p>
-    <p>New users password confirm: <input type="password" id="passwordConfirm"></p>
+    <h2>REGISTRATION</h2>
 
-    <button id="registerButton" disabled type="submit">REGISTER YOURSELF AS USER</button>
-
-    <div id="controls">
-        <button id="logInButton" disabled type="button" class="buttonLogIn" onclick="logIn()" >LOGIN</button>
+    <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Enter name...">
     </div>
 
-    <img class="displayed" src="../img/black.png" alt="" width="240" height="384" >
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="******">
+    </div>
+
+    <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="passwordConfirm" placeholder="******">
+    </div>
+
+    <button id="registerButton" disabled class="btn-reg">CREATE ACCOUNT</button>
+    <button id="logInButton" disabled class="btn-reg" onclick="logIn()">GO TO LOGIN</button>
+
+    <img class="displayed" src="/img/black.png" alt="Tetris Logo">
 </div>
 
-<audio id="registered_sound">
-    <!-- src будут установлены через jQuery при загрузке страницы -->
-    <source type="audio/mpeg"></source>
-    <source type="audio/ogg"></source>
-</audio>
+<audio id="registered_sound" src="/sounds/registered.mp3" preload="auto"></audio>
 
 </body>
 </html>

@@ -1,25 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Tetris - Welcome</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.css" rel="stylesheet"/>
     <style>
-         body {
+        body {
             font-family: 'Courier New', monospace;
-            font-size: 25px;
             background-color: rgb(255, 0, 0);
+            color: #000;
+            text-align: center; /* Центрируем текст по умолчанию */
+            padding: 20px;
         }
-        #controls{text-align: center;}
-        .buttonStart { position: absolute; font-size: 16px; top:50%; background-color:#0a0a23; color: #fff; }
-        .buttonProfile { font-size: 16px; background-color:#0a0a11; color: #fff; }
-        .buttonAdmin { font-size: 16px; background-color:#0a0a11; color: #fff; }
-        #header{text-align: center;}
-        #helloBox{font-size: 50px;}
-        #bestPlayerBox{font-size: 35px;}
-        #bestScoreBox{font-size: 35px;}
-        img.displayed { display: block; margin-left: auto; margin-right: auto }
-        img.raging { display: block; margin-left: auto; margin-right: auto }
+
+        #helloBox { font-size: 45px; display: block; margin-bottom: 10px; }
+        #bestPlayerBox, #bestScoreBox { font-size: 28px; display: block; }
+
+        /* Контейнер для картинок */
+        .image-container {
+            margin: 20px auto;
+        }
+
+        img.displayed, img.raging {
+            display: block;
+            margin: 10px auto;
+            border: 2px solid black;
+        }
+
+        /* Современная панель управления */
+        #controls {
+            margin-top: 30px;
+            display: flex;
+            justify-content: center;
+            gap: 15px; /* Расстояние между кнопками */
+            flex-wrap: wrap;
+        }
+
+        .btn-custom {
+            font-size: 18px;
+            padding: 10px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .buttonStart { background-color: #0a0a23; color: #fff; font-weight: bold; }
+        .buttonProfile, .buttonAdmin { background-color: #222; color: #fff; }
+
+        .btn-custom:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-custom:hover:not(:disabled) {
+            transform: scale(1.05);
+            filter: brightness(1.2);
+        }
     </style>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
@@ -27,131 +65,78 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
     <script>
-    // --- УНИВЕРСАЛЬНАЯ КОНФИГУРАЦИЯ ---
-    // Определяем корень сайта автоматически
-    var BASE_URL = window.location.origin;
-    // ---------------------------
-
     var stompClient = null;
 
     setTimeout(connect, 500);
 
     function setConnected(connected) {
-        // Чтобы кнопки РАБОТАЛИ (не были disabled), передаем false в prop("disabled")
-        $("#startGameButton").prop("disabled", !connected);
-        $("#adminButton").prop("disabled", !connected);
-        $("#profileButton").prop("disabled", !connected);
-    }
-
-    function frameHandlerDaoGame(frame) {
-        console.log('Connected (Dao): ' + frame);
-        stompClient.subscribe('/receive/daoGameObjects', function (daoGame) {
-            showDaoGame(daoGame.body);
-        });
-    }
-
-    function frameHandlerGame(frame) {
-        stompClient.subscribe('/receive/gameObjects', function (game) {
-            showGame(game.body);
-        });
+        $("#startGameButton, #adminButton, #profileButton").prop("disabled", !connected);
     }
 
     function connect() {
-        // Автоматический выбор ws/wss в зависимости от того, как открыт сайт
         var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         var wsUrl = protocol + "//" + window.location.host + "/websocket";
 
         stompClient = new window.StompJs.Client({
-            webSocketFactory: function () {
-                return new WebSocket(wsUrl);
-            }
+            webSocketFactory: function () { return new WebSocket(wsUrl); }
         });
 
         stompClient.onConnect = function (frame) {
-            frameHandlerDaoGame(frame);
-            frameHandlerGame(frame);
-            setConnected(true); // Соединение есть — кнопки активны
+            stompClient.subscribe('/receive/daoGameObjects', (d) => showDaoGame(d.body));
+            stompClient.subscribe('/receive/gameObjects', (g) => showGame(g.body));
 
-            stompClient.publish({
-                destination:"/app/hello",
-                body: JSON.stringify({ '': '' })
-            });
+            setConnected(true);
+            stompClient.publish({ destination:"/app/hello", body: "{}" });
+            playSound('hello_sound');
         };
 
-        stompClient.onWebsocketClose = function () {
-            setConnected(false);
-            console.log("WebSocket closed");
-        };
-
-        playSound('hello_sound');
+        stompClient.onWebSocketClose = () => setConnected(false);
         stompClient.activate();
     }
 
-    // Используем относительные пути для переходов
-    function index() { window.location.href = "/html/index.html"; }
-    function admin() { window.location.href = "/html/admin.html"; }
-    function profile() { window.location.href = "/html/profile.html"; }
-
     function showDaoGame(game) {
-       var jsonDaoGame = JSON.parse(game);
-       var bestPlayer = jsonDaoGame['playerName'];
-       var bestScore = jsonDaoGame['playerScore'];
-        $("#bestPlayerBox").text('Wanna challenge the best player ' + bestPlayer);
-        $("#bestScoreBox").text('with his score ' + bestScore + '?');
+       var json = JSON.parse(game);
+       $("#bestPlayerBox").text('Wanna challenge the best player ' + json.playerName);
+       $("#bestScoreBox").text('with his score ' + json.playerScore + '?');
     }
 
     function showGame(game) {
-       var jsonGame = JSON.parse(game);
-       var playerName = jsonGame['playerName'];
-       $("#helloBox").text('Hello ' + playerName + '! WELCOME TO RAGING HORSE TETRIS!');
+       var json = JSON.parse(game);
+       $("#helloBox").text('Hello ' + json.playerName + '! WELCOME TO RAGING HORSE TETRIS!');
     }
 
     $(function () {
-        // Относительные пути для ресурсов (звуков и картинок)
-       $("#src-hello-mp3").attr("src", "/sounds/hello.mp3");
-       $("#src-hello-ogg").attr("src", "/sounds/hello.ogg");
-       $("#hello_sound")[0].load();
-
-
-        // Картинки тоже лучше подстраховать относительным путем
-        $(".displayed").attr("src", "/img/black.png");
-        $(".raging").attr("src", "/img/raging.jpg");
-
-        $("#startGameButton").click(index);
-        $("#adminButton").click(admin);
-        $("#profileButton").click(profile);
+        $("#startGameButton").click(() => window.location.href = "/html/index.html");
+        $("#adminButton").click(() => window.location.href = "/html/admin.html");
+        $("#profileButton").click(() => window.location.href = "/html/profile.html");
     });
 
     function playSound(id){
         var audio = document.getElementById(id);
-        if (!audio) return;
-
-        audio.play().catch(function(e) {
-            console.log("Autoplay blocked: " + e);
-        });
+        if (audio) audio.play().catch(e => console.log("Audio blocked"));
     }
 </script>
-
 </head>
 <body>
 
-<h1 text align="center"> <b id="helloBox"> </b> </h1>
-<h2 text align="center"> <b id="bestPlayerBox"> </b> </h2>
-<h3 text align="center"> <b id="bestScoreBox"></b> </h3>
-<img class="displayed" src="../img/black.png" alt="" width="240" height="384" >
-<img class="raging" src="../img/raging.jpg" alt="" width="120" height="120">
+<header>
+    <b id="helloBox">Loading...</b>
+    <b id="bestPlayerBox"></b>
+    <b id="bestScoreBox"></b>
+</header>
 
-<div id="controls">
-    <button id="startGameButton" disabled type="button" class="buttonStart" >Start</button>
-    <button id="profileButton" disabled type="button" class="buttonProfile" >Your Profile</button>
-    <button id="adminButton" disabled type="button" class="buttonAdmin" >Admin</button>
+<div class="image-container">
+    <img class="displayed" src="/img/black.png" alt="Tetris" width="240" height="384">
+    <img class="raging" src="/img/raging.jpg" alt="Raging Horse" width="120" height="120">
 </div>
 
-<audio id="hello_sound">
-    <source id="src-hello-mp3" type="audio/mpeg">
-    <source id="src-hello-ogg" type="audio/ogg">
-</audio>
+<div id="controls">
+    <button id="startGameButton" disabled class="btn-custom buttonStart">Start Game</button>
+    <button id="profileButton" disabled class="btn-custom buttonProfile">Your Profile</button>
+    <button id="adminButton" disabled class="btn-custom buttonAdmin">Admin</button>
+</div>
 
+<audio id="hello_sound" src="/sounds/hello.mp3" preload="auto"></audio>
 
 </body>
 </html>

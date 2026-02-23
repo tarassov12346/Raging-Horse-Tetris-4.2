@@ -1,6 +1,5 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
-        "http://www.w3.org/TR/html4/loose.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <title>Tetris</title>
@@ -10,8 +9,46 @@
            font-family: 'Courier New', monospace;
            font-size: 14px;
            background-color: rgb(255, 255, 128);
+           text-align: center; /* Центрирование контента */
         }
 
+        /* Главная настройка для сетки Тетриса */
+        #table {
+            background-color: #ffffff;
+            border: 1px black solid;
+            border-collapse: collapse; /* Склеивает границы ячеек */
+            border-spacing: 0;         /* Убирает промежутки */
+            margin: 0 auto;            /* Центрирование таблицы */
+        }
+
+        #table td {
+            padding: 0;                /* Убирает внутренние отступы в ячейках */
+            line-height: 0;            /* Убирает межстрочные интервалы */
+        }
+
+        #table img {
+            display: block;            /* Убирает микро-отступ под картинкой */
+            width: 25px;               /* Настрой размер под свои картинки, если нужно */
+            height: 25px;
+        }
+
+        /* Стиль для информационной таблицы */
+        .info-table {
+            background-color: #ffffff;
+            border: 1px black solid;
+            border-collapse: collapse;
+            margin: 10px auto;
+            width: 600px;
+        }
+
+        .info-table td {
+            border: 1px solid black;
+            padding: 5px;
+        }
+
+        #controls {
+            margin-top: 15px;
+        }
     </style>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
@@ -19,17 +56,16 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
     <script>
-    // --- УНИВЕРСАЛЬНАЯ КОНФИГУРАЦИЯ ---
-    var BASE_URL = window.location.origin;
-    // ---------------------------
-
     var stompClient = null;
     var score = 0;
+
+    var isGameOverSoundPlayed = false; // Флаг, чтобы звук не повторялся
+
+
 
     setTimeout(connect, 500);
 
     function setConnected(connected) {
-        // Кнопки активны, когда connected = true
         $("#leftButton, #rightButton, #rotateButton, #dropButton, #newGameButton, #saveButton, #restartButton")
             .prop("disabled", !connected);
     }
@@ -45,70 +81,89 @@
         });
 
         stompClient.onConnect = function (frame) {
-            console.log('Connected: ' + frame);
-
             stompClient.subscribe('/receive/stateObjects', (s) => showState(s.body));
             stompClient.subscribe('/receive/stateFinal', (s) => showFinalState(s.body));
             stompClient.subscribe('/receive/stateSaved', (s) => showSavedState(s.body));
             stompClient.subscribe('/receive/daoGameObjects', (s) => showDaoGame(s.body));
 
             setConnected(true);
-
-            stompClient.publish({
-                destination: "/app/start",
-                body: JSON.stringify({ '': '' })
-            });
+            stompClient.publish({ destination: "/app/start", body: JSON.stringify({ '': '' }) });
         };
 
         stompClient.onWebSocketClose = () => setConnected(false);
-
         playSound('snap_sound');
         stompClient.activate();
     }
 
-    // Общая функция отрисовки матрицы
     function updateMatrix(matrix) {
         for (let i = 0; i < 20; i++) {
             for (let j = 0; j < 12; j++) {
-                // Используем относительный путь для картинок
                 $("#c" + i + "v" + j).attr("src", "/img/" + matrix[i][j] + ".png");
             }
         }
     }
 
     function showState(state) {
-        var json = JSON.parse(state);
-        var status = json['running'];
+    var json = JSON.parse(state);
+    var status = json['running'];
 
-        if (json['game']['playerScore'] > score) {
-            playSound('score_sound');
-            score = json['game']['playerScore'];
-        } else {
+    // 1. Проверяем очки: если выросли — играем звук очков
+    if (json['game']['playerScore'] > score) {
+        playSound('score_sound');
+        score = json['game']['playerScore'];
+    }
+    // 2. ЕСЛИ ОЧКИ НЕ ВЫРОСЛИ: проверяем, играет ли фоновая музыка
+    else {
+        var bgMusic = document.getElementById('game_sound');
+        // Запускаем музыку только если она стоит на паузе (т.е. еще не играла или закончилась)
+        if (bgMusic && bgMusic.paused) {
             playSound('game_sound');
         }
-
-        $("#playerBox").text(json['game']['playerName']);
-        $("#playerScoreBox").text(score);
-        $("#tetrisSpeedBox").text('TETRIS at speed ' + (score/10 + 1));
-
-        if (status) {
-            $("#gameStatusBox").text('Game status: ON');
-            updateMatrix(json['stage']['cells']);
-        } else {
-            $("#gameStatusBox").text('Game status: PLS WAIT!!!');
-            setConnected(false);
-            playSound('registered_sound');
-            snapShot();
-        }
     }
 
-    function showFinalState(state) {
-        var json = JSON.parse(state);
-        $("#gameStatusBox").text('Game status: OVER');
+    $("#playerBox").text(json['game']['playerName']);
+    $("#playerScoreBox").text(score);
+    $("#tetrisSpeedBox").text('TETRIS at speed ' + (Math.floor(score/10) + 1));
+
+    if (status) {
+        $("#gameStatusBox").text('Game status: ON');
         updateMatrix(json['stage']['cells']);
-        $("#newGameButton").prop("disabled", false);
+    } else {
+        $("#gameStatusBox").text('Game status: PLS WAIT!!!');
+        setConnected(false);
+
+        // Играем, только если флаг "ложь"
+    if (!isGameOverSoundPlayed) {
         playSound('registered_sound');
+        isGameOverSoundPlayed = true; // Сразу блокируем повторы
     }
+
+        playSound('registered_sound');
+        snapShot();
+    }
+}
+
+
+   function showFinalState(state) {
+    var json = JSON.parse(state);
+    $("#gameStatusBox").text('Game status: OVER');
+    updateMatrix(json['stage']['cells']);
+    $("#newGameButton").prop("disabled", false);
+
+    if (status) {
+    $("#ragingHorse").show(); // Показываем ковбоя, когда играем
+} else {
+    $("#ragingHorse").hide(); // Прячем, когда пауза или проигрыш
+}
+
+
+    // Проверяем тот же флаг. Если в showState он уже стал true — здесь звук не сработает
+    if (!isGameOverSoundPlayed) {
+        playSound('registered_sound');
+        isGameOverSoundPlayed = true;
+    }
+}
+
 
     function showSavedState(state) {
         var json = JSON.parse(state);
@@ -124,7 +179,6 @@
     }
 
     $(function() {
-        // Генерация сетки через относительные пути
         var tableHtml = "";
         for (var i = 0; i < 20; i++) {
             tableHtml += "<tr>";
@@ -135,21 +189,13 @@
         }
         $("#table").html(tableHtml);
 
-        // Настройка звуков через относительные пути
         const sounds = ['game_sound', 'score_sound', 'snap_sound', 'registered_sound'];
         const files = ['0', 'score', 'snap', 'registered'];
 
-        sounds.forEach((id, idx) => {
-            var $a = $("#" + id);
-            $a.find("source[type='audio/mpeg']").attr("src", "/sounds/" + files[idx] + ".mp3");
-            $a.find("source[type='audio/ogg']").attr("src", "/sounds/" + files[idx] + ".ogg");
-            $a[0].load();
-        });
-
-        // Кнопки
         $("#newGameButton").click(() => {
+        isGameOverSoundPlayed = false; // Сбрасываем флаг для новой игры
             stompClient.publish({ destination: "/app/hello", body: JSON.stringify({ '': '' }) });
-            window.location.href = "/html/profile.html";
+            window.location.href = "/html/hello.html";
         });
 
         $("#leftButton").click(left);
@@ -160,7 +206,6 @@
         $("#restartButton").click(restart);
     });
 
-    // Управление
     function left() { stompClient.publish({ destination: "/app/2", body: "{}" }); }
     function right() { stompClient.publish({ destination: "/app/3", body: "{}" }); }
     function rotate() { stompClient.publish({ destination: "/app/1", body: "{}" }); }
@@ -170,9 +215,34 @@
     function snapShot() { stompClient.publish({ destination: "/app/snapShot", body: "{}" }); }
 
     function playSound(id) {
-        var audio = document.getElementById(id);
-        if (audio) audio.play().catch(() => {});
+    var audio = document.getElementById(id);
+    if (!audio) return;
+
+    // ГЛАВНОЕ ИСПРАВЛЕНИЕ:
+    // Если это фоновая музыка (game_sound)
+    if (id === 'game_sound') {
+        audio.loop = true; // На всякий случай включаем цикл
+        // Если музыка УЖЕ играет, просто выходим из функции и не прерываем её
+        if (!audio.paused) {
+            return;
+        }
     }
+
+    // Для эффектов (очки, падение) — всегда сбрасываем в начало, чтобы звук был четким
+    if (id !== 'game_sound') {
+        audio.currentTime = 0;
+    }
+
+    // Запускаем воспроизведение
+    audio.play().catch(function(error) {
+        // Игнорируем ошибку, если пользователь еще не кликнул по странице
+        console.log("Audio play blocked or failed: ", error);
+    });
+}
+
+
+
+
 
     document.onkeydown = function(e) {
         if (e.keyCode == 37) left();
@@ -181,34 +251,146 @@
         if (e.keyCode == 38) rotate();
     };
 </script>
-
 </head>
 <body>
 
-<h1 text align="center"><b id="tetrisSpeedBox"> </b></h1>
-<h2 text align="center"><b id="gameStatusBox"> </b></h2>
 
-<table align="center" style="background-color: #ffffff; border:1px black solid;" border="1" width="600">
-    <tr>
-        <td><b> Player </b></td>
-        <td id="playerBox"></td>
-        <td><b> Score </b></td>
-        <td id="playerScoreBox"></td>
-    </tr>
-    <tr>
-        <td><b> Best Player </b></td>
-        <td id="bestPlayerBox"></td>
-        <td><b> Best Score </b></td>
-        <td id="bestPlayerScoreBox"></td>
-    </tr>
-</table>
+<!-- Обертка, которая держит таблицу в центре, а ковбоя — сбоку -->
+<div class="game-area-wrapper">
+    <h1 id="tetrisSpeedBox">&nbsp;</h1>
+    <h2 id="gameStatusBox">&nbsp;</h2>
+    <!-- Ковбой СЛЕВА -->
+    <div id="rodeo-zone-left" class="rodeo-box">
+        <img src="/img/rodeo.gif" class="ragingHorse" alt="Raging Horse Left">
+        <div class="dust-cloud"></div>
+    </div>
 
-<table id="table" align="center" style="background-color: #ffffff; border:1px black solid;">
+    <table class="info-table">
+        <tr>
+            <td><b> Player </b></td>
+            <td id="playerBox"></td>
+            <td><b> Score </b></td>
+            <td id="playerScoreBox"></td>
+        </tr>
+        <tr>
+            <td><b> Best Player </b></td>
+            <td id="bestPlayerBox"></td>
+            <td><b> Best Score </b></td>
+            <td id="bestPlayerScoreBox"></td>
+        </tr>
+    </table>
 
-</table>
+    <table id="table">
+        <!-- Сетка генерируется скриптом -->
+    </table>
+    <!-- Ковбой СПРАВА (добавленный) -->
+    <div id="rodeo-zone-right" class="rodeo-box">
+        <img src="/img/rodeo.gif" class="ragingHorse" alt="Raging Horse Right">
+        <div class="dust-cloud"></div>
+    </div>
+
 </div>
 
-<div id="controls" align="center">
+
+
+
+
+
+
+<style>
+    .game-area-wrapper {
+        position: relative;
+        display: inline-block;
+        margin: 20px auto;
+    }
+
+    /* Общие стили для обоих ковбоев */
+    .rodeo-box {
+        position: absolute;
+        top: 50px;
+        width: 200px;
+        height: 150px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+    }
+
+    /* Позиция СЛЕВА */
+    #rodeo-zone-left {
+        left: -250px;
+    }
+
+    /* Позиция СПРАВА */
+    #rodeo-zone-right {
+        right: -250px;
+    }
+
+    /* Отражаем правого ковбоя по горизонтали, чтобы он смотрел на таблицу */
+    #rodeo-zone-right .ragingHorse {
+        transform: scaleX(-1);
+    }
+
+    .ragingHorse {
+        width: 180px;
+        height: auto;
+        z-index: 10;
+        animation: bucking 0.8s infinite ease-in-out;
+        filter: drop-shadow(5px 5px 10px rgba(0,0,0,0.2));
+    }
+
+    /* Совмещаем анимацию брыкания с отражением для правого ковбоя */
+    #rodeo-zone-right .ragingHorse {
+        animation: bucking-right 0.8s infinite ease-in-out;
+    }
+
+    /* Твоя пыль (остается без изменений) */
+    .dust-cloud {
+        position: absolute;
+        bottom: 10px;
+        width: 60px;
+        height: 15px;
+        background: rgba(139, 69, 19, 0.3);
+        border-radius: 50%;
+        filter: blur(5px);
+        animation: dust 0.8s infinite;
+    }
+
+    /* Анимация для левого (обычная) */
+    @keyframes bucking {
+        0%   { transform: translateY(0) rotate(0deg); }
+        25%  { transform: translateY(-15px) rotate(-5deg); }
+        50%  { transform: translateY(5px) rotate(5deg); }
+        75%  { transform: translateY(-10px) rotate(-2deg); }
+        100% { transform: translateY(0) rotate(0deg); }
+    }
+
+    /* Анимация для правого (с сохранением отражения scaleX(-1)) */
+    @keyframes bucking-right {
+        0%   { transform: scaleX(-1) translateY(0) rotate(0deg); }
+        25%  { transform: scaleX(-1) translateY(-15px) rotate(5deg); }
+        50%  { transform: scaleX(-1) translateY(5px) rotate(-5deg); }
+        75%  { transform: scaleX(-1) translateY(-10px) rotate(2deg); }
+        100% { transform: scaleX(-1) translateY(0) rotate(0deg); }
+    }
+
+    @keyframes dust {
+        0%, 100% { transform: scale(1); opacity: 0.3; }
+        50% { transform: scale(1.5); opacity: 0.1; }
+    }
+
+    /* Стили таблицы остаются прежними */
+    #table {
+        border-collapse: collapse;
+        border-spacing: 0;
+        margin: 0 auto !important;
+    }
+    #table td { padding: 0; line-height: 0; }
+    #table img { display: block; width: 25px; height: 25px; }
+</style>
+
+
+
+<div id="controls">
     <button id="leftButton" disabled>Left</button>
     <button id="rotateButton" disabled>Rotate</button>
     <button id="dropButton" disabled>Drop</button>
@@ -218,25 +400,12 @@
     <button id="rightButton" disabled>Right</button>
 </div>
 
-<audio id="game_sound">
-    <source type="audio/mpeg">
-    <source type="audio/ogg">
-</audio>
+<!-- Замените свои аудио-теги на эти -->
+<audio id="game_sound" src="/sounds/0.mp3" loop preload="auto"></audio>
+<audio id="score_sound" src="/sounds/score.mp3" preload="auto"></audio>
+<audio id="snap_sound" src="/sounds/snap.mp3" preload="auto"></audio>
+<audio id="registered_sound" src="/sounds/registered.mp3" preload="auto"></audio>
 
-<audio id="score_sound">
-    <source type="audio/mpeg">
-    <source type="audio/ogg">
-</audio>
-
-<audio id="snap_sound">
-    <source type="audio/mpeg">
-    <source type="audio/ogg">
-</audio>
-
-<audio id="registered_sound">
-    <source type="audio/mpeg">
-    <source type="audio/ogg">
-</audio>
 
 </body>
 </html>

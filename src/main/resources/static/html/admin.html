@@ -1,69 +1,87 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Admin</title>
-
+    <title>Admin Panel</title>
+    <link href="https://cdnjs.cloudflare.com" rel="stylesheet"/>
     <style>
-          body {
-          background-color: rgb(209, 209, 209);
-           }
+        body {
+            background-color: rgb(209, 209, 209);
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            text-align: center;
+        }
 
-          h1 {
-             text-align: center;
-          },
-          h2 {
-              text-align: center;
-          },
-          table,
-          thead,
-          td,
-          th {
-              border: 1px solid;
-              padding: 20px;
-              text-align: center;
-          }
+        h1, h2 {
+            margin-top: 30px;
+            font-weight: bold;
+        }
 
-          table {
-              text-align: center;
-          }
+        /* Общие стили для таблиц */
+        table {
+            background-color: #fff;
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 90%;
+            max-width: 1000px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
 
-          thead {
-              text-align: center;
-         }
+        th, td {
+            border: 1px solid #999;
+            padding: 12px;
+            text-align: center;
+        }
 
-         #usersAll{text-align: center;}
-          #usersAll{margin-left: auto;
-          margin-right: auto;}
+        th {
+            background-color: #444;
+            color: #fff;
+        }
 
-          #users{text-align: center;}
-          #users{margin-left: auto;
-          margin-right: auto;}
-          #results{margin-left: auto;
-          margin-right: auto;}
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
 
-          img.displayed {
-          display: block;
-          margin-left: auto;
-          margin-right: auto }
+        /* Кнопки */
+        .btn-delete {
+            background-color: #d9534f;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
 
-          .buttonProfile {
-           font-size: 16px;
-           background-color:#0a0a11;
-           color: #fff;
-          }
+        .btn-delete:hover {
+            background-color: #c9302c;
+        }
 
+        .buttonProfile {
+            font-size: 18px;
+            background-color: #0a0a11;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            margin-top: 20px;
+            transition: 0.3s;
+        }
 
-      </style>
+        .buttonProfile:disabled {
+            background-color: #666;
+        }
+
+        img.displayed {
+            margin: 30px auto;
+            border: 2px solid #000;
+        }
+    </style>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
-
     <script>
-    // --- УНИВЕРСАЛЬНАЯ КОНФИГУРАЦИЯ ---
-    const BASE_URL = window.location.origin;
     var stompClient = null;
 
     setTimeout(connect, 500);
@@ -81,126 +99,94 @@
         });
 
         stompClient.onConnect = function (frame) {
-            console.log('Connected Admin: ' + frame);
             stompClient.subscribe('/receive/users', (msg) => showUsers(msg.body));
             stompClient.subscribe('/receive/results', (msg) => showResults(msg.body));
             stompClient.subscribe('/receive/alert', (msg) => window.alert(msg.body));
 
             setConnected(true);
-            sendForAdmin();
+            stompClient.publish({ destination: "/app/admin", body: "{}" });
+            playSound('admin_sound');
         };
 
         stompClient.onWebSocketClose = () => setConnected(false);
-
-        playSound('admin_sound');
         stompClient.activate();
     }
 
     function showUsers(users) {
-        const jsonUser = JSON.parse(users);
+        const user = JSON.parse(users);
         $("#users").append(`<tr>
-            <td>${jsonUser.id}</td>
-            <td>${jsonUser.username}</td>
-            <td>${jsonUser.password}</td>
-            <td>${jsonUser.passwordConfirm}</td>
-            <td><button class="btn btn-danger" onclick="deleteUser(${jsonUser.id})">DELETE ${jsonUser.id}</button></td>
+            <td>${user.id}</td>
+            <td>${user.username}</td>
+            <td>******</td> <!-- Скрываем пароли в админке для безопасности -->
+            <td>${user.passwordConfirm || 'User'}</td>
+            <td><button class="btn-delete" onclick="deleteUser(${user.id})">DELETE</button></td>
         </tr>`);
     }
 
     function deleteUser(id) {
-        if(!confirm("Are you sure?")) return;
+        if(!confirm("Are you sure you want to delete user " + id + "?")) return;
         stompClient.publish({
             destination: "/app/admin/" + id,
-            body: JSON.stringify({ '': '' })
+            body: "{}"
         });
-        // Используем относительный путь для обновления
-        setTimeout(() => { window.location.href = "/html/admin.html"; }, 300);
+        // Перезагрузка страницы через небольшую паузу
+        setTimeout(() => { window.location.reload(); }, 500);
     }
 
     function showResults(game) {
-        const jsonGame = JSON.parse(game);
+        const res = JSON.parse(game);
         $("#results").append(`<tr>
-            <td>${jsonGame.id}</td>
-            <td>${jsonGame.playerName}</td>
-            <td>${jsonGame.playerScore}</td>
+            <td>${res.id}</td>
+            <td>${res.playerName}</td>
+            <td>${res.playerScore}</td>
         </tr>`);
     }
 
-    function profile() {
-        window.location.href = "/html/profile.html";
-    }
-
     $(function () {
-        // Относительные пути для аудио
-        $("#admin-mp3").attr("src", "/sounds/admin.mp3");
-        $("#admin-ogg").attr("src", "/sounds/admin.ogg");
-        const audio = document.getElementById("admin_sound");
-        if (audio) audio.load();
-
-        // Относительные пути для картинок
-        $(".js-url").each(function() {
-            const path = $(this).data("src");
-            if (path) $(this).attr("src", path);
-        });
-
-        $("#profileButton").click(profile);
+        $("#profileButton").click(() => { window.location.href = "/html/profile.html"; });
     });
-
-    function sendForAdmin() {
-        stompClient.publish({
-            destination: "/app/admin",
-            body: JSON.stringify({ '': '' })
-        });
-    }
 
     function playSound(id) {
         const audio = document.getElementById(id);
-        if (audio) audio.play().catch(e => console.log("Autoplay blocked"));
+        if (audio) audio.play().catch(e => console.log("Audio blocked"));
     }
 </script>
-
 </head>
-
 <body>
 
-<div id="usersAll">
-    <h1>ALL REGISTERED USERS</h1>
-    <table class="table table-striped" id="users">
-        <thead>
-        <tr>
-            <th>ID</th>
-            <th>USER</th>
-            <th>PASSWORD</th>
-            <th>ROLES</th>
-            <th>CONTROLS</th>
-        </tr>
-        </thead>
-    </table>
+<h1>ALL REGISTERED USERS</h1>
+<table id="users">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>USER</th>
+        <th>PASSWORD</th>
+        <th>ROLES</th>
+        <th>CONTROLS</th>
+    </tr>
+    </thead>
+    <tbody><!-- Сюда JS добавит строки --></tbody>
+</table>
 
-    <h2>USERS BEST SCORES</h2>
-    <table id="results">
-        <thead>
-        <tr>
-            <th>ID</th>
-            <th>PLAYER</th>
-            <th>SCORE</th>
-        </tr>
-        </thead>
-    </table>
-    <button id="profileButton" disabled type="button" class="buttonProfile" >Your Profile</button>
-</div>
+<h2>USERS BEST SCORES</h2>
+<table id="results">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>PLAYER</th>
+        <th>SCORE</th>
+    </tr>
+    </thead>
+    <tbody><!-- Сюда JS добавит строки --></tbody>
+</table>
+
+<button id="profileButton" disabled class="buttonProfile">Go to Profile</button>
 
 <div id="images">
-    <!-- Добавили класс js-url и data-src -->
-    <img class="displayed js-url" data-src="/img/black.png" src="" alt="" width="240" height="384" >
+    <img class="displayed" src="/img/black.png" alt="Admin Decor" width="240" height="384">
 </div>
 
-<audio id="admin_sound">
-    <!-- ID для управления путями -->
-    <source id="admin-mp3" type="audio/mpeg">
-    <source id="admin-ogg" type="audio/ogg">
-</audio>
+<audio id="admin_sound" src="/sounds/admin.mp3" preload="auto"></audio>
 
 </body>
-
 </html>
