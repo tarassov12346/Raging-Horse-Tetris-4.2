@@ -16,31 +16,32 @@ public class GameServiceImpl implements GameService {
     @LoadBalanced
     protected RestTemplate restTemplate;
 
-    protected String serviceUrl;
+    // Базовый путь теперь всегда ведет на Гейтвей + префикс нужного роута
+    private final String GATEWAY_URL = "http://gateway-service/game-service";
 
     public GameServiceImpl() {
     }
 
     @Override
     public String getGameData(String playerName) {
-        return restTemplate.getForObject("http://game-service" + "/score?playerName={playerName}", String.class, playerName);
+        return restTemplate.getForObject(GATEWAY_URL + "/score?playerName={playerName}", String.class, playerName);
     }
 
     @Override
     public List<Game> getAllGames() {
         ResponseEntity<Game[]> response =
-                restTemplate.getForEntity("http://game-service/games", Game[].class);
+                restTemplate.getForEntity(GATEWAY_URL + "/games", Game[].class);
         return new ArrayList<>(Arrays.stream(response.getBody()).toList());
     }
 
     @Override
     public void deleteGameData(String playerName) {
-        restTemplate.delete("http://game-service" + "/delete?playerName={playerName}", playerName);
+        restTemplate.delete(GATEWAY_URL + "/delete?playerName={playerName}", playerName);
     }
 
     @Override
     public void doRecord(Game game) {
-        restTemplate.postForObject("http://game-service/record", game, Game.class);
+        restTemplate.postForObject(GATEWAY_URL + "/record", game, Game.class);
     }
 
     @Override

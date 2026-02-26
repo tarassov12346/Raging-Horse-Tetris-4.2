@@ -24,41 +24,44 @@ public class MongoServiceImpl implements MongoService {
     @LoadBalanced
     protected RestTemplate restTemplate;
 
+    // Стучимся в Гейтвей по его имени в Эврике + префикс из роута №3
+    private final String GATEWAY_MONGO_URL = "http://gateway-service/mongo-service";
+
     @Override
     public void saveGame(SavedGame savedGame) {
-        restTemplate.postForObject("http://mongo-service/save", savedGame, SavedGame.class);
+        restTemplate.postForObject(GATEWAY_MONGO_URL + "/save", savedGame, SavedGame.class);
     }
 
     @Override
     public Optional<SavedGame> gameRestart(String playerName) {
-        return Optional.ofNullable(restTemplate.getForObject("http://mongo-service" + "/restart?playerName={playerName}", SavedGame.class, playerName));
+        return Optional.ofNullable(restTemplate.getForObject(GATEWAY_MONGO_URL + "/restart?playerName={playerName}", SavedGame.class, playerName));
     }
 
     @Override
     public void cleanSavedGameMongodb(String playerName) {
-        restTemplate.delete("http://mongo-service" + "/delete?playerName={playerName}", playerName);
+        restTemplate.delete(GATEWAY_MONGO_URL + "/delete?playerName={playerName}", playerName);
     }
 
     @Override
     public void prepareMongoDBForNewPLayer(String playerName) {
-        restTemplate.getForObject("http://mongo-service" + "/prepare?playerName={playerName}", String.class, playerName);
+        restTemplate.getForObject(GATEWAY_MONGO_URL + "/prepare?playerName={playerName}", String.class, playerName);
     }
 
     @Override
     public void cleanImageMongodb(String playerName, String fileName) {
-        restTemplate.delete("http://mongo-service" + "/delete_image?playerName={playerName}&fileName={fileName}", playerName, fileName);
+        restTemplate.delete(GATEWAY_MONGO_URL + "/delete_image?playerName={playerName}&fileName={fileName}", playerName, fileName);
     }
 
     @Override
     public byte[] loadByteArrayFromMongodb(String playerName, String fileName) {
         ResponseEntity<byte[]> response =
-                restTemplate.getForEntity("http://mongo-service" + "/bytes?playerName={playerName}&fileName={fileName}", byte[].class, playerName, fileName);
+                restTemplate.getForEntity(GATEWAY_MONGO_URL + "/bytes?playerName={playerName}&fileName={fileName}", byte[].class, playerName, fileName);
         return response.getBody();
     }
 
     @Override
     public void loadMugShotIntoMongodb(String playerName, byte[] data) {
-        restTemplate.postForObject("http://mongo-service/mugShot?playerName={playerName}", data, byte[].class, playerName);
+        restTemplate.postForObject(GATEWAY_MONGO_URL + "/mugShot?playerName={playerName}", data, byte[].class, playerName);
     }
 
     @Override
@@ -70,7 +73,6 @@ public class MongoServiceImpl implements MongoService {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        restTemplate.postForObject("http://mongo-service/snapShot?playerName={playerName}&fileName={fileName}", data, byte[].class, playerName, fileName);
-
+        restTemplate.postForObject(GATEWAY_MONGO_URL + "/snapShot?playerName={playerName}&fileName={fileName}", data, byte[].class, playerName, fileName);
     }
 }

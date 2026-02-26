@@ -25,52 +25,56 @@ public class UsersServiceImpl implements UsersService, UserDetailsService {
     @LoadBalanced
     protected RestTemplate restTemplate;
 
+    // Стучимся в Гейтвей по его имени в Эврике + префикс из роута №2
+    private final String GATEWAY_USERS_URL = "http://gateway-service/users-service";
+
+
     @Override
     public boolean saveUser(Users newUser) {
-        return Objects.requireNonNull(restTemplate.postForObject("http://users-service/save", newUser, Boolean.class));
+        return Objects.requireNonNull(restTemplate.postForObject(GATEWAY_USERS_URL + "/save", newUser, Boolean.class));
     }
 
     @Override
     public void deleteUser(Long userId) {
-        restTemplate.delete("http://users-service" + "/delete?userId={userId}", userId);
+        restTemplate.delete(GATEWAY_USERS_URL + "/delete?userId={userId}", userId);
     }
 
     @Override
     public Users findUserById(Long userId) {
-        return restTemplate.getForObject("http://users-service" + "/findId?userId={userId}", Users.class, userId);
+        return restTemplate.getForObject(GATEWAY_USERS_URL + "/findId?userId={userId}", Users.class, userId);
     }
 
     @Override
     public Users findUserByUserName(String userName) {
-        return restTemplate.getForObject("http://users-service" + "/findName?userName={userName}", Users.class, userName);
+        return restTemplate.getForObject(GATEWAY_USERS_URL + "/findName?userName={userName}", Users.class, userName);
     }
 
     @Override
     public List<Users> getAllUsers() {
         ResponseEntity<Users[]> response =
-                restTemplate.getForEntity("http://users-service/users", Users[].class);
+                restTemplate.getForEntity(GATEWAY_USERS_URL + "/users", Users[].class);
         return new ArrayList<>(Arrays.stream(response.getBody()).toList());
     }
 
     @Override
     public boolean isRolesDBEmpty() {
-        return restTemplate.getForObject("http://users-service/isEmpty", Boolean.class);
+        return restTemplate.getForObject(GATEWAY_USERS_URL + "/isEmpty", Boolean.class);
     }
 
     @Override
     public void prepareRolesDB() {
-        restTemplate.getForObject("http://users-service/prepareRolesDB", Void.class);
+        restTemplate.getForObject(GATEWAY_USERS_URL + "/prepareRolesDB", Void.class);
     }
 
     @Override
     public void prepareUserDB() {
-        restTemplate.getForObject("http://users-service/prepareUserDB", Void.class);
+        restTemplate.getForObject(GATEWAY_USERS_URL + "/prepareUserDB", Void.class);
     }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
-        Users user = restTemplate.getForObject("http://users-service" + "/findName?userName={userName}", Users.class, username);
+        Users user = restTemplate.getForObject(GATEWAY_USERS_URL + "/findName?userName={userName}", Users.class, username);
 
         List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role))  // Префикс ROLE_ если нужно
