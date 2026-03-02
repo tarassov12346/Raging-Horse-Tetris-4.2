@@ -1,54 +1,43 @@
 package com.app.game.tetris.gameserviceImpl;
 
+import com.app.game.tetris.client.GameClient;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Game;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @Service
 public class GameServiceImpl implements GameService {
-    @Autowired
-    @LoadBalanced
-    protected RestTemplate restTemplate;
+    private final GameClient gameClient;
 
-    // Базовый путь теперь всегда ведет на Гейтвей + префикс нужного роута
-    private final String GATEWAY_URL = "http://gateway-service/game-service";
-
-    public GameServiceImpl() {
+    // Рекомендую инжекцию через конструктор вместо @Autowired на поле
+    public GameServiceImpl(GameClient gameClient) {
+        this.gameClient = gameClient;
     }
-
     @Override
     public String getGameData(String playerName) {
-        return restTemplate.getForObject(GATEWAY_URL + "/score?playerName={playerName}", String.class, playerName);
+        return gameClient.getGameData(playerName);
     }
-
     @Override
     public List<Game> getAllGames() {
-        ResponseEntity<Game[]> response =
-                restTemplate.getForEntity(GATEWAY_URL + "/games", Game[].class);
-        return new ArrayList<>(Arrays.stream(response.getBody()).toList());
+        // Feign сам преобразует JSON в List<Game>, стримы больше не нужны
+        return gameClient.getAllGames();
     }
-
     @Override
     public void deleteGameData(String playerName) {
-        restTemplate.delete(GATEWAY_URL + "/delete?playerName={playerName}", playerName);
+        gameClient.deleteGameData(playerName);
     }
-
     @Override
     public void doRecord(Game game) {
-        restTemplate.postForObject(GATEWAY_URL + "/record", game, Game.class);
+        gameClient.doRecord(game);
     }
-
     @Override
     public Set<Game> getAllBestResults(List<Game> playersList) {
-        Set<Game> highestScoringPlayers = new HashSet<>();
-        playersList.sort(Comparator.comparingInt(Game::getPlayerScore).reversed());
-        highestScoringPlayers.addAll(playersList);
+        // Локальная логика обработки остается без изменений
+        Set<Game> highestScoringPlayers = new HashSet<>(playersList);
         return highestScoringPlayers;
     }
 }
