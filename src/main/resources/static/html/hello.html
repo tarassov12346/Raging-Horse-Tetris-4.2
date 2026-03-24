@@ -3,39 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <title>Tetris - Welcome</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.css" rel="stylesheet"/>
+    <!-- Bootstrap 3 оставляем для сетки, если нужно -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.css" rel="stylesheet")/>>
+
     <style>
         body {
             font-family: 'Courier New', monospace;
-            background-color: rgb(255, 0, 0);
+            background-color: #ff0000; /* Резануло глаз, но стиль уважаю :) */
             color: #000;
-            text-align: center; /* Центрируем текст по умолчанию */
+            text-align: center;
             padding: 20px;
         }
-
         #helloBox { font-size: 45px; display: block; margin-bottom: 10px; }
         #bestPlayerBox, #bestScoreBox { font-size: 28px; display: block; }
+        .image-container { margin: 20px auto; }
+        img { display: block; margin: 10px auto; border: 2px solid black; }
 
-        /* Контейнер для картинок */
-        .image-container {
-            margin: 20px auto;
-        }
-
-        img.displayed, img.raging {
-            display: block;
-            margin: 10px auto;
-            border: 2px solid black;
-        }
-
-        /* Современная панель управления */
         #controls {
             margin-top: 30px;
             display: flex;
             justify-content: center;
-            gap: 15px; /* Расстояние между кнопками */
+            gap: 15px;
             flex-wrap: wrap;
         }
-
         .btn-custom {
             font-size: 18px;
             padding: 10px 25px;
@@ -44,90 +34,102 @@
             cursor: pointer;
             transition: 0.3s;
         }
-
         .buttonStart { background-color: #0a0a23; color: #fff; font-weight: bold; }
         .buttonProfile, .buttonAdmin { background-color: #222; color: #fff; }
-
-        .btn-custom:disabled {
-            background-color: #555;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-
-        .btn-custom:hover:not(:disabled) {
-            transform: scale(1.05);
-            filter: brightness(1.2);
-        }
+        .btn-custom:disabled { background-color: #555; cursor: not-allowed; opacity: 0.6; }
+        .btn-custom:hover:not(:disabled) { transform: scale(1.05); filter: brightness(1.2); }
     </style>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
     <script>
-    var stompClient = null;
+    let stompClient = null;
 
-    setTimeout(connect, 500);
+    // Сразу пытаемся подключиться
+    $(document).ready(connect);
 
     function setConnected(connected) {
-        $("#startGameButton, #adminButton, #profileButton").prop("disabled", !connected);
+        $("#controls button").prop("disabled", !connected);
     }
 
     function connect() {
-        var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        var wsUrl = protocol + "//" + window.location.host + "/websocket";
+        const token = localStorage.getItem('jwt_token');
+
+        // ВСТАВЛЯЙ СЮДА:
+    console.log("=== DEBUG START ===");
+    console.log("Token exists:", !!token);
+    console.log("Token value (first 10 chars):", token ? token.substring(0, 10) + "..." : "NULL");
+
+
+        if (!token) {
+            window.location.href = "/login"; // Упростили путь, Gateway разберется
+            return;
+        }
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Сделай так (добавляем токен в URL):
+        const wsUrl = `${protocol}//${window.location.host}/websocket?token=${token}`;
 
         stompClient = new window.StompJs.Client({
-            webSocketFactory: function () { return new WebSocket(wsUrl); }
+            brokerURL: wsUrl,
+            connectHeaders: { 'Authorization': `Bearer ${token}` },
+            reconnectDelay: 5000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000
         });
 
-        stompClient.onConnect = function (frame) {
-            stompClient.subscribe('/receive/daoGameObjects', (d) => showDaoGame(d.body));
-            stompClient.subscribe('/receive/gameObjects', (g) => showGame(g.body));
-
+        stompClient.onConnect = (frame) => {
+            console.log('Connected via Gateway');
             setConnected(true);
-            stompClient.publish({ destination:"/app/hello", body: "{}" });
-            playSound('hello_sound');
+
+            // Подписки на персональные очереди
+            stompClient.subscribe('/topic/daoGameObjects', (msg) => {
+                const data = JSON.parse(msg.body);
+                $("#bestPlayerBox").text(`Wanna challenge ${data.playerName || 'None'}?`);
+                $("#bestScoreBox").text(`with score ${data.playerScore || 0}`);
+            });
+
+            stompClient.subscribe('/user/queue/gameObjects', (msg) => {
+                const data = JSON.parse(msg.body);
+                $("#helloBox").text(`Hello ${data.playerName || 'Player'}! WELCOME!`);
+            });
+
+            // Уведомляем сервер. Сервер возьмет UserID из Principal (из токена)
+            stompClient.publish({ destination: "/app/hello" });
+
+            const audio = document.getElementById('hello_sound');
+            if (audio) audio.play().catch(() => console.log("Autoplay blocked"));
         };
 
-        stompClient.onWebSocketClose = () => setConnected(false);
+        stompClient.onStompError = (frame) => {
+            console.error('STOMP Error', frame);
+            // Если Gateway вернул 401/403, выбрасываем на логин
+            if (frame.headers['message'].includes("UNAUTHORIZED")) {
+                window.location.href = "/login";
+            }
+        };
+
         stompClient.activate();
     }
 
-    function showDaoGame(game) {
-       var json = JSON.parse(game);
-       $("#bestPlayerBox").text('Wanna challenge the best player ' + json.playerName);
-       $("#bestScoreBox").text('with his score ' + json.playerScore + '?');
-    }
-
-    function showGame(game) {
-       var json = JSON.parse(game);
-       $("#helloBox").text('Hello ' + json.playerName + '! WELCOME TO RAGING HORSE TETRIS!');
-    }
-
     $(function () {
-        $("#startGameButton").click(() => window.location.href = "/html/index.html");
+         $("#startGameButton").click(() => window.location.href = "/html/index.html");
         $("#adminButton").click(() => window.location.href = "/html/admin.html");
         $("#profileButton").click(() => window.location.href = "/html/profile.html");
     });
-
-    function playSound(id){
-        var audio = document.getElementById(id);
-        if (audio) audio.play().catch(e => console.log("Audio blocked"));
-    }
-</script>
+    </script>
 </head>
 <body>
-
 <header>
-    <b id="helloBox">Loading...</b>
-    <b id="bestPlayerBox"></b>
-    <b id="bestScoreBox"></b>
+    <div id="helloBox">Loading...</div>
+    <div id="bestPlayerBox"></div>
+    <div id="bestScoreBox"></div>
 </header>
 
 <div class="image-container">
-    <img class="displayed" src="/img/black.png" alt="Tetris" width="240" height="384">
-    <img class="raging" src="/img/raging.jpg" alt="Raging Horse" width="120" height="120">
+    <img src="/img/black.png" alt="Tetris" width="240" height="384">
+    <img src="/img/raging.jpg" alt="Raging Horse" width="120" height="120">
 </div>
 
 <div id="controls">
@@ -137,6 +139,5 @@
 </div>
 
 <audio id="hello_sound" src="/sounds/hello.mp3" preload="auto"></audio>
-
 </body>
 </html>

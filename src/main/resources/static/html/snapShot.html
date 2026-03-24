@@ -70,22 +70,39 @@
     <!-- Таблица будет создана автоматически скриптом -->
 </table>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+
+
 <script>
+    var stompClient = null;
+    var score = 0;
+    const token = localStorage.getItem('jwt_token');
+
+    // 1. Сразу проверяем токен
+    if (!token) {
+        window.location.href = "/html/login.html";
+    }
+
+    // 2. Генерируем сетку при загрузке
     (function generateTable() {
         var table = document.getElementById("table");
         var html = "";
-        var imgPath = "/img/0.png";
-
         for (var r = 0; r < 20; r++) {
             html += "<tr>";
             for (var v = 0; v < 12; v++) {
-                html += '<td><img id="c' + r + 'v' + v + '" src="' + imgPath + '"></td>';
+                html += '<td><img id="c' + r + 'v' + v + '" src="/img/0.png"></td>';
             }
             html += "</tr>";
         }
         table.innerHTML = html;
     })();
+
+
+
 </script>
+
 
 </body>
 </html>

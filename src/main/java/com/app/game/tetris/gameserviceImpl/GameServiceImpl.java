@@ -5,6 +5,7 @@ import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Game;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -36,8 +37,13 @@ public class GameServiceImpl implements GameService {
     }
     @Override
     public Set<Game> getAllBestResults(List<Game> playersList) {
+
+        List<Game> sortedList = playersList.stream()
+                .sorted(Comparator.comparingInt(Game::getPlayerScore).reversed())
+                .toList();
+
         // Локальная логика обработки остается без изменений
-        Set<Game> highestScoringPlayers = new HashSet<>(playersList);
+        Set<Game> highestScoringPlayers = new HashSet<>(sortedList);
         return highestScoringPlayers;
     }
 }

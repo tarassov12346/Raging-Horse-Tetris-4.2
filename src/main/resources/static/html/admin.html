@@ -84,41 +84,76 @@
     <script>
     var stompClient = null;
 
-    setTimeout(connect, 500);
+    // Подключаемся сразу при загрузке
+    $(document).ready(connect);
 
     function setConnected(connected) {
         $("#profileButton").prop("disabled", !connected);
     }
 
     function connect() {
+        const token = localStorage.getItem('jwt_token');
+
+        if (!token) {
+            console.error("Токен не найден, перенаправляем на логин");
+            window.location.href = "/login.html";
+            return;
+        }
+
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = protocol + "//" + window.location.host + "/websocket";
+        // ВАЖНО: Добавляем токен в URL, как в рабочем примере
+        const wsUrl = `${protocol}//${window.location.host}/websocket?token=${token}`;
 
         stompClient = new window.StompJs.Client({
-            webSocketFactory: () => new WebSocket(wsUrl)
+            brokerURL: wsUrl,
+            connectHeaders: {
+                'Authorization': 'Bearer ' + token
+            },
+            reconnectDelay: 5000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000
         });
 
         stompClient.onConnect = function (frame) {
-            stompClient.subscribe('/receive/users', (msg) => showUsers(msg.body));
-            stompClient.subscribe('/receive/results', (msg) => showResults(msg.body));
-            stompClient.subscribe('/receive/alert', (msg) => window.alert(msg.body));
-
+            console.log('Connected to Admin Panel');
             setConnected(true);
+
+            // Очищаем таблицы перед заполнением
+            $("#users tbody").empty();
+            $("#results tbody").empty();
+
+            // Подписки
+            stompClient.subscribe('/topic/users', (msg) => showUsers(msg.body));
+            stompClient.subscribe('/topic/results', (msg) => showResults(msg.body));
+            stompClient.subscribe('/user/queue/alert', (msg) => window.alert(msg.body));
+
+            // Запрашиваем данные
             stompClient.publish({ destination: "/app/admin", body: "{}" });
             playSound('admin_sound');
         };
 
-        stompClient.onWebSocketClose = () => setConnected(false);
+        stompClient.onWebSocketClose = () => {
+            console.warn('WebSocket connection closed');
+            setConnected(false);
+        };
+
+        stompClient.onStompError = (frame) => {
+            console.error('STOMP Error:', frame);
+        };
+
         stompClient.activate();
     }
 
-    function showUsers(users) {
-        const user = JSON.parse(users);
-        $("#users").append(`<tr>
+    function showUsers(usersData) {
+        const user = JSON.parse(usersData);
+        // Используем passwordConfirm для ролей, как в твоей логике
+        const roles = user.passwordConfirm || "USER";
+
+        $("#users tbody").append(`<tr>
             <td>${user.id}</td>
             <td>${user.username}</td>
-            <td>******</td> <!-- Скрываем пароли в админке для безопасности -->
-            <td>${user.passwordConfirm || 'User'}</td>
+            <td>******</td>
+            <td>${roles}</td>
             <td><button class="btn-delete" onclick="deleteUser(${user.id})">DELETE</button></td>
         </tr>`);
     }
@@ -129,13 +164,13 @@
             destination: "/app/admin/" + id,
             body: "{}"
         });
-        // Перезагрузка страницы через небольшую паузу
+        // Пауза перед обновлением, чтобы сервер успел обработать удаление
         setTimeout(() => { window.location.reload(); }, 500);
     }
 
-    function showResults(game) {
-        const res = JSON.parse(game);
-        $("#results").append(`<tr>
+    function showResults(gameData) {
+        const res = JSON.parse(gameData);
+        $("#results tbody").append(`<tr>
             <td>${res.id}</td>
             <td>${res.playerName}</td>
             <td>${res.playerScore}</td>
@@ -148,9 +183,10 @@
 
     function playSound(id) {
         const audio = document.getElementById(id);
-        if (audio) audio.play().catch(e => console.log("Audio blocked"));
+        if (audio) audio.play().catch(e => console.log("Audio blocked by browser"));
     }
 </script>
+
 </head>
 <body>
 

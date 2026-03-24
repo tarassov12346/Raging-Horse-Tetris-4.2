@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Tetris - Profile</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.css" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com" rel="stylesheet">
     <style>
         body {
             font-family: 'Courier New', monospace;
@@ -39,21 +39,22 @@
         .photo-label { font-size: 14px; font-weight: bold; text-transform: uppercase; }
 
         img.snapShot, img.snapShotBest {
-            width: 400px; /* Оптимальный размер для современных экранов */
+            width: 400px;
             height: auto;
             border: 3px solid #000;
             background-color: #333;
+            min-height: 200px; /* Чтобы блок не прыгал при загрузке */
         }
 
         img.mugShot {
             width: 150px;
             height: 150px;
-            border-radius: 50%; /* Круглый аватар */
+            border-radius: 50%;
             border: 4px solid #fff;
             object-fit: cover;
+            background-color: #444;
         }
 
-        /* Формы и кнопки */
         .action-area {
             background: rgba(255,255,255,0.1);
             padding: 20px;
@@ -76,7 +77,6 @@
         .btn-custom:disabled { background-color: #555; cursor: not-allowed; }
         .btn-custom:hover:not(:disabled) { transform: scale(1.05); filter: brightness(1.2); }
 
-        /* Кастомный input file */
         .input-file { position: relative; display: inline-block; margin-top: 10px; }
         .input-file-btn {
             display: inline-block;
@@ -86,7 +86,6 @@
             border-radius: 4px;
             background-color: #419152;
             padding: 10px 20px;
-            transition: 0.2s;
         }
         .input-file input[type=file] { position: absolute; z-index: -1; opacity: 0; display: block; width: 0; height: 0; }
         .input-file-text { display: block; margin-top: 5px; font-size: 12px; color: #eee; }
@@ -99,33 +98,85 @@
     <script>
     var stompClient = null;
 
-    setTimeout(connect, 500);
+    // Подключаемся при загрузке документа (как в рабочей админке)
+    $(document).ready(connect);
 
     function connect() {
+        const token = localStorage.getItem('jwt_token');
+        if (!token) {
+            window.location.href = "/login.html";
+            return;
+        }
+
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = protocol + "//" + window.location.host + "/websocket";
+        // ВАЖНО: Добавляем токен в URL, чтобы сервер авторизовал WebSocket соединение
+        const wsUrl = `${protocol}//${window.location.host}/websocket?token=${token}`;
 
         stompClient = new window.StompJs.Client({
-            webSocketFactory: () => new WebSocket(wsUrl)
+            brokerURL: wsUrl,
+            connectHeaders: { 'Authorization': 'Bearer ' + token },
+            reconnectDelay: 5000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000
         });
 
         stompClient.onConnect = function (frame) {
-            stompClient.subscribe('/receive/playerStat', (msg) => {
+            console.log('Connected to Profile');
+
+            // 1. Подписки на данные игрока
+            stompClient.subscribe('/user/queue/playerStat', (msg) => {
                 const json = JSON.parse(msg.body);
                 $("#profileBox").text(`Hello ${json.playerName}! Best score: ${json.playerScore}`);
             });
-            stompClient.subscribe('/receive/playerAttemptsNumber', (msg) => {
+            stompClient.subscribe('/user/queue/playerAttemptsNumber', (msg) => {
                 const json = JSON.parse(msg.body);
                 $("#profileAttemptsBox").text(`Games played: ${json.playerScore}`);
             });
 
+            // 2. Загрузка защищенных картинок через fetch с токеном
+            loadSecureImage('.mugShot', '/getPhoto');
+            loadSecureImage('.snapShot', '/getSnapShot');
+            loadSecureImage('.snapShotBest', '/getSnapShotBest');
+
             $("#startGameButton").prop("disabled", false);
             stompClient.publish({ destination: "/app/profile", body: "{}" });
+
             playSound('profile_sound');
+        };
+
+        stompClient.onStompError = (frame) => {
+            console.error('STOMP error:', frame);
         };
 
         stompClient.activate();
     }
+
+    // Функция загрузки картинок с JWT авторизацией
+   async function loadSecureImage(selector, url) {
+    const token = localStorage.getItem('jwt_token');
+     const userId = localStorage.getItem('user_id');
+    try {
+        const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + token,
+            'X-User-Id': userId, // БЕЗ ЭТОГО БУДЕТ ОШИБКА 400 или 500
+            'Accept': 'image/*'
+        }
+    });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const objectURL = URL.createObjectURL(blob);
+            $(selector).attr('src', objectURL);
+        } else {
+            console.error("Ошибка загрузки:", response.status);
+        }
+    } catch (e) {
+        console.error("Ошибка сетевого запроса:", e);
+    }
+}
+
 
     function sendFile() {
         const fileInput = document.getElementById('filename');
@@ -138,9 +189,15 @@
                 body: reader.result.split(',')[1]
             });
             alert("Avatar updated!");
-            setTimeout(() => { $(".mugShot").attr("src", "/getPhoto?t=" + Date.now()); }, 500);
+            // После загрузки обновляем только фото профиля
+            setTimeout(() => { loadSecureImage('.mugShot', '/getPhoto'); }, 500);
         }
         reader.readAsDataURL(fileInput.files[0]);
+    }
+
+    function playSound(id) {
+        const audio = document.getElementById(id);
+        if (audio) audio.play().catch(() => {});
     }
 
     $(function () {
@@ -148,14 +205,9 @@
         $("#uploadButton").click(sendFile);
 
         $('#filename').on('change', function() {
-            $(this).siblings('.input-file-text').text(this.files[0].name);
+            if(this.files[0]) $(this).siblings('.input-file-text').text(this.files[0].name);
         });
     });
-
-    function playSound(id) {
-        const audio = document.getElementById(id);
-        if (audio) audio.play().catch(() => {});
-    }
     </script>
 </head>
 <body>
@@ -166,16 +218,17 @@
 <div class="gallery-container">
     <div class="photo-block">
         <span class="photo-label">Last Result</span>
-        <img class="snapShot" src="/getSnapShot" alt="Last Game">
+        <!-- src пустой, заполнится через loadSecureImage -->
+        <img class="snapShot" src="" alt="Last Game">
     </div>
 
     <div class="photo-block">
         <span class="photo-label">Your Mugshot</span>
-        <img class="mugShot" src="/getPhoto" alt="Avatar">
+        <img class="mugShot" src="" alt="Avatar">
         <div class="action-area">
             <form id="forms">
                 <label class="input-file">
-                    <input type="file" id="filename">
+                    <input type="file" id="filename" accept="image/*">
                     <span class="input-file-btn">Choose Photo</span>
                     <span class="input-file-text">max 8kb</span>
                 </label>
@@ -187,7 +240,7 @@
 
     <div class="photo-block">
         <span class="photo-label">Best Result</span>
-        <img class="snapShotBest" src="/getSnapShotBest" alt="Best Game">
+        <img class="snapShotBest" src="" alt="Best Game">
     </div>
 </div>
 

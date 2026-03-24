@@ -33,8 +33,11 @@ public class GameArtefactServiceImpl implements GameArtefactService {
 
         // Оборачиваем всё создание страницы в try-catch
         try (Page page = browser.newPage()) {
+            // Используем встроенный контекст страницы
+            page.context().addInitScript("localStorage.setItem('jwt_token', 'fake-token')");
             char[][] cells = playGameService.drawTetraminoOnCells(state);
             page.navigate(baseUrl + "/html/snapShot.html");
+            page.waitForSelector("#c19v11"); // Ждем самую последнюю ячейку
 
             for (int i = 0; i < 20; i++) {
                 for (int j = 0; j < 12; j++) {

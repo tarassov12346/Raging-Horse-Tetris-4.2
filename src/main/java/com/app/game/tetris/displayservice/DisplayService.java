@@ -14,7 +14,7 @@ public interface DisplayService {
 
     void sendSavedStateToBeDisplayed(PlayGameService playGameService, GameService gameService, ScheduledExecutorService service, SimpMessagingTemplate template, String userId);
 
-    void sendDaoGameToBeDisplayed(Game game, SimpMessagingTemplate template);
+    void sendDaoGameToBeDisplayed(Game game, SimpMessagingTemplate template, String userId);
 
-    void sendGameToBeDisplayed(Game game, SimpMessagingTemplate template);
+    void sendGameToBeDisplayed(Game game, SimpMessagingTemplate template, String userId);
 }

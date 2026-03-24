@@ -6,10 +6,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
 
-@FeignClient(name = "gateway-service",
-        contextId = "mongoClient", // Уникальный ID для этого клиента
-        path = "/mongo-service")
+@FeignClient(name = "mongo-service", // Имя микросервиса Mongo из Eureka
+        contextId = "mongoClient")
 public interface MongoFeignClient {
+
     @PostMapping("/save")
     void saveGame(@RequestBody SavedGame savedGame);
 

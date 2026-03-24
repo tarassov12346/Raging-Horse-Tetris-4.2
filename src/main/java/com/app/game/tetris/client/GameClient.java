@@ -8,10 +8,10 @@ import java.util.List;
 
 // name = имя сервиса в Eureka (gateway-service)
 // path = префикс, который ты вешал в RestTemplate
-@FeignClient(name = "gateway-service",
-        contextId = "gameClient", // Уникальный ID
-        path = "/game-service")
+@FeignClient(name = "game-service", // Имя микросервиса с Postgres в Eureka
+        contextId = "gameClient")
 public interface GameClient {
+
     @GetMapping("/score")
     String getGameData(@RequestParam("playerName") String playerName);
 
