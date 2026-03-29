@@ -101,6 +101,8 @@
     stompClient.onConnect = function (frame) {
         console.log('Connected successfully!');
 
+        playSound('snap_sound');
+
         stompClient.subscribe('/user/queue/stateObjects', (s) => showState(s.body));
         stompClient.subscribe('/user/queue/stateFinal', (s) => showFinalState(s.body));
         stompClient.subscribe('/user/queue/stateSaved', (s) => showSavedState(s.body));

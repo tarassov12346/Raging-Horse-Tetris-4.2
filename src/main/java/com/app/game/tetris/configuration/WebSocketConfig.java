@@ -20,19 +20,11 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    @Autowired
-    private JwtUtils jwtUtils;
-
-    @Override
-    public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/queue", "/topic");
-        registry.setApplicationDestinationPrefixes("/app");
-        registry.setUserDestinationPrefix("/user");
-    }
-
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/websocket").setAllowedOriginPatterns("*");
+        registry.addEndpoint("/websocket")
+                .setAllowedOriginPatterns("*")
+                .addInterceptors(new UserHandshakeInterceptor()); // СВЯЗКА С ГЕЙТВЕЕМ ТУТ
     }
 
     @Override
@@ -43,38 +35,31 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
                 if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                    // 1. Пытаемся достать токен (через заголовок или параметр)
-                    String authHeader = accessor.getFirstNativeHeader("Authorization");
-                    String token = (authHeader != null && authHeader.startsWith("Bearer "))
-                            ? authHeader.substring(7)
-                            : accessor.getFirstNativeHeader("token"); // на случай Firefox
+                    // Берем данные, которые UserHandshakeInterceptor бережно достал из заголовков Гейтвея
+                    String userId = (String) accessor.getSessionAttributes().get("userId");
+                    String username = (String) accessor.getSessionAttributes().get("username");
 
-                    if (token != null) {
-                        try {
-                            // 2. Извлекаем ОБЕ характеристики из JWT
-                            String userId = jwtUtils.extractUserId(token);
-                            String username = jwtUtils.extractUsername(token);
-
-                            if (userId != null && username != null) {
-                                // 3. Устанавливаем "комбо-принципал" через разделитель
-                                String principalName = userId + ":" + username;
-                                // Используем стандартный класс Spring Security
-                                UsernamePasswordAuthenticationToken auth =
-                                        new UsernamePasswordAuthenticationToken(principalName, null, java.util.Collections.emptyList());
-
-                                accessor.setUser(auth); // Теперь в контроллере (Authentication) principal сработает
-
-                                System.out.println("✅ WS Auth Success: " + principalName);
-                            }
-                        } catch (Exception e) {
-                            System.err.println("❌ JWT Error in WS: " + e.getMessage());
-                        }
+                    if (userId != null) {
+                        String principalName = userId + ":" + (username != null ? username : "User");
+                        UsernamePasswordAuthenticationToken auth =
+                                new UsernamePasswordAuthenticationToken(principalName, null, java.util.Collections.emptyList());
+                        accessor.setUser(auth);
+                        System.out.println("✅ WS Connected via Gateway: " + principalName);
                     } else {
-                        System.err.println("❌ No token found in CONNECT frame");
+                        System.err.println("❌ WS Connection refused: No headers from Gateway");
+                        // Если хочешь жестко обрывать соединение:
+                        // throw new org.springframework.messaging.MessagingException("Unauthorized");
                     }
                 }
                 return message;
             }
         });
+    }
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry registry) {
+        registry.enableSimpleBroker("/queue", "/topic");
+        registry.setApplicationDestinationPrefixes("/app");
+        registry.setUserDestinationPrefix("/user");
     }
 }
