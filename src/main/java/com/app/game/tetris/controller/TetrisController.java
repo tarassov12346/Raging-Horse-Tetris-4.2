@@ -1,7 +1,6 @@
 package com.app.game.tetris.controller;
 
 import com.app.game.tetris.displayservice.DisplayService;
-import com.app.game.tetris.dto.UserRegistrationDto;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Roles;
@@ -10,16 +9,13 @@ import com.app.game.tetris.model.Users;
 import com.app.game.tetris.mongoservice.MongoService;
 import com.app.game.tetris.tetriservice.PlayGameService;
 import com.app.game.tetris.users_service.UsersService;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.Valid;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -30,8 +26,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import java.util.concurrent.TimeUnit;
 
 @Controller
 public class TetrisController {
@@ -281,6 +278,27 @@ public class TetrisController {
                         playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")),
                         template, destinationId
                 );
+ /*               Thread.ofVirtual().start(() -> {
+                    try {
+                        while (!Thread.interrupted()) {
+                            displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, destinationId);
+                            Thread.sleep(java.time.Duration.ofMillis(1000)); // Замена через Duration
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });*/
+
+  /*              // Создаем планировщик, который для каждой задачи спавнит виртуальный поток
+                var scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
+
+                playGameService.setSEService(scheduler, userId);
+                playGameService.getSEService(userId).scheduleAtFixedRate(
+                        () -> displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, destinationId),
+                0, 1000, TimeUnit.MILLISECONDS
+);*/
+
+
                 // Запуск таймера падения фигур
                 playGameService.setSEService(Executors.newScheduledThreadPool(1), userId);
                 playGameService.getSEService(userId).scheduleAtFixedRate(
