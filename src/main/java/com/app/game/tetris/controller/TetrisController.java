@@ -1,6 +1,8 @@
 package com.app.game.tetris.controller;
 
 import com.app.game.tetris.displayservice.DisplayService;
+import com.app.game.tetris.dto.PlayerAttemptsDTO;
+import com.app.game.tetris.dto.PlayerProfileDTO;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Roles;
@@ -120,12 +122,13 @@ public class TetrisController {
         // 3. Запрашиваем статистику из GameService по имени
         JSONObject jsonGameData = new JSONObject(gameService.getGameData(playerName));
 
-        // 4. Отправляем статистику на фронт
-        this.template.convertAndSendToUser(destinationId,"/queue/playerStat",
-                playGameService.createGame(playerName, jsonGameData.getInt("playerbestscore")));
+        // 1. Отправляем профиль (имя и лучший счет)
+        this.template.convertAndSendToUser(destinationId, "/queue/playerStat",
+                new PlayerProfileDTO(playerName, jsonGameData.getInt("playerbestscore")));
 
-        this.template.convertAndSendToUser(destinationId,"/queue/playerAttemptsNumber",
-                playGameService.createGame("DataTransferObject", jsonGameData.getInt("playerAttemptsNumber")));
+        // 2. Отправляем попытки (только число)
+        this.template.convertAndSendToUser(destinationId, "/queue/playerAttemptsNumber",
+                new PlayerAttemptsDTO(jsonGameData.getInt("playerAttemptsNumber")));
     }
 
 

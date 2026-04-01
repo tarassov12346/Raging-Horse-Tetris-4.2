@@ -123,15 +123,20 @@
         stompClient.onConnect = function (frame) {
             console.log('Connected to Profile');
 
-            // 1. Подписки на данные игрока
+            // Внутри stompClient.onConnect:
+
+// Подписка 1: Данные профиля (playerName и playerScore)
             stompClient.subscribe('/user/queue/playerStat', (msg) => {
-                const json = JSON.parse(msg.body);
-                $("#profileBox").text(`Hello ${json.playerName}! Best score: ${json.playerScore}`);
+                const { playerName, playerScore } = JSON.parse(msg.body);
+                $("#profileBox").text(`Hello ${playerName}! Best score: ${playerScore}`);
             });
+
+// Подписка 2: Попытки (поле attempts)
             stompClient.subscribe('/user/queue/playerAttemptsNumber', (msg) => {
-                const json = JSON.parse(msg.body);
-                $("#profileAttemptsBox").text(`Games played: ${json.playerScore}`);
+                const { attempts } = JSON.parse(msg.body);
+                $("#profileAttemptsBox").text(`Games played: ${attempts}`);
             });
+
 
             // 2. Загрузка защищенных картинок через fetch с токеном
             loadSecureImage('.mugShot', '/getPhoto');
