@@ -3,47 +3,59 @@ package com.app.game.tetris.gameserviceImpl;
 import com.app.game.tetris.client.GameClient;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Game;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class GameServiceImpl implements GameService {
     private final GameClient gameClient;
 
-    // Рекомендую инжекцию через конструктор вместо @Autowired на поле
     public GameServiceImpl(GameClient gameClient) {
         this.gameClient = gameClient;
     }
+
+    @Async
     @Override
-    public String getGameData(String playerName) {
-        return gameClient.getGameData(playerName);
+    public CompletableFuture<String> getGameData(String playerName) {
+        log.info("🌐 Запрос рекордов для {} через виртуальный поток", playerName);
+        String data = gameClient.getGameData(playerName);
+        return CompletableFuture.completedFuture(data);
     }
+
     @Override
     public List<Game> getAllGames() {
-        // Feign сам преобразует JSON в List<Game>, стримы больше не нужны
+        // Оставляем синхронным, если этот список нужен немедленно для дальнейшей логики
         return gameClient.getAllGames();
     }
+
+    @Async
     @Override
     public void deleteGameData(String playerName) {
         gameClient.deleteGameData(playerName);
     }
+
+    @Async
     @Override
     public void doRecord(Game game) {
+        log.info("🏆 Сохранение рекорда в фоне...");
         gameClient.doRecord(game);
     }
+
     @Override
     public Set<Game> getAllBestResults(List<Game> playersList) {
-
-        List<Game> sortedList = playersList.stream()
+        // Только вычисления — оставляем как есть
+        return playersList.stream()
                 .sorted(Comparator.comparingInt(Game::getPlayerScore).reversed())
-                .toList();
-
-        // Локальная логика обработки остается без изменений
-        Set<Game> highestScoringPlayers = new HashSet<>(sortedList);
-        return highestScoringPlayers;
+                .collect(Collectors.toSet());
     }
 }
+

@@ -67,86 +67,91 @@ public class TetrisController {
 
     @MessageMapping("/hello")
     public void hello(Principal principal) {
-        if (principal == null) {
-            log.error("❌ Unauthorized WS access attempt: Principal is null");
-            return;
-        }
+        if (principal == null) return;
 
-        // 1. Сохраняем полный адрес для отправки (ID:USERNAME)
-        // Именно это значение Spring использует как ключ для поиска WebSocket-сессии
         String destinationId = principal.getName();
-
-        // 2. Распаковываем данные для логики сервисов
-        String[] parts = destinationId.split(":");
-        String userId = parts[0];
-        String username = (parts.length > 1) ? parts[1] : "Player_" + userId;
-
-        log.info("🚀 Игрок вошел. ID: [{}], Name: [{}]. Адрес доставки: [{}]", userId, username, destinationId);
+        String userId = destinationId.split(":")[0];
+        String username = (destinationId.contains(":")) ? destinationId.split(":")[1] : "Player_" + userId;
 
         try {
-            // Инициализация состояния (тут нужны чистые ID и Name)
+            // 1. Инициализация (синхронно, так как это база для состояния)
             var gameState = playGameService.initiateState(username, userId);
             playGameService.setState(gameState, userId);
 
-            // Асинхронная подготовка БД
-            CompletableFuture.runAsync(() -> mongoService.prepareMongoDBForNewPLayer(username));
+            // 2. Метод помечен @Async в сервисе, поэтому он сам уйдет в виртуальный поток.
+            // Нам не нужно писать Thread.startVirtualThread здесь.
+            mongoService.prepareMongoDBForNewPLayer(username);
 
-            // --- ВАЖНО: В DisplayService передаем destinationId (полную строку) ---
-
-            // 3. Отправка стартового визуала
+            // 3. Сразу отправляем игроку игровое поле
             displayService.sendGameToBeDisplayed(gameState.getGame(), template, destinationId);
 
-            // 4. Получение и отправка рекордов
-            String rawData = gameService.getGameData(username);
-            if (rawData != null && !rawData.isEmpty()) {
-                JSONObject jsonGameData = new JSONObject(rawData);
+            // 4. Асинхронно запрашиваем статистику.
+            // Основной поток метода завершится, а когда придет ответ — отправим рекорды.
+            gameService.getGameData(username).thenAccept(rawData -> {
+                if (rawData != null && !rawData.isEmpty()) {
+                    try {
+                        JSONObject jsonGameData = new JSONObject(rawData);
+                        GameDataDTO gameDataRecord = new GameDataDTO(
+                                jsonGameData.optString("bestplayer", "None"),
+                                jsonGameData.optInt("bestscore", 0)
+                        );
+                        displayService.sendDaoGameToBeDisplayed(gameDataRecord, template, destinationId);
+                        log.info("📊 Рекорды для {} успешно отправлены", username);
+                    } catch (Exception e) {
+                        log.error("💥 Ошибка парсинга JSON для {}: {}", username, e.getMessage());
+                    }
+                }
+            });
 
-                // Создаем рекорд напрямую из данных JSON
-                GameDataDTO gameDataRecord = new GameDataDTO(
-                        jsonGameData.optString("bestplayer", "None"),
-                        jsonGameData.optInt("bestscore", 0)
-                );
-
-                // Передаем рекорд в метод (сигнатуру которого мы поправили ранее)
-                displayService.sendDaoGameToBeDisplayed(
-                        gameDataRecord,
-                        template,
-                        destinationId
-                );
-            }
-
-
-            log.info("✅ Инициализация завершена для: {}", username);
-
+            log.info("🚀 Основная инициализация завершена для: {}", username);
         } catch (Exception e) {
-            log.error("💥 Ошибка в обработчике hello для {}: {}", userId, e.getMessage());
+            log.error("💥 Ошибка в hello: {}", e.getMessage());
         }
     }
 
 
+
+
     @MessageMapping("/profile")
     public void profile(Principal principal) {
+        if (principal == null) return;
+
         String destinationId = principal.getName();
+        String userId = destinationId.split(":")[0];
 
-        // 2. Распаковываем данные для логики сервисов
-        String[] parts = destinationId.split(":");
-        String userId = parts[0];
-        String username = (parts.length > 1) ? parts[1] : "Player_" + userId;
+        // Получаем стейт из мапы (память)
+        var state = playGameService.getState(userId);
+        if (state == null) {
+            log.warn("⚠️ Попытка доступа к профилю без активного стейта для ID: {}", userId);
+            return;
+        }
+        String playerName = state.getGame().getPlayerName();
 
+        // 1. Асинхронный вызов микросервиса через CompletableFuture
+        gameService.getGameData(playerName).thenAccept(rawData -> {
+            if (rawData != null && !rawData.isEmpty()) {
+                try {
+                    JSONObject jsonGameData = new JSONObject(rawData);
 
-        // 2. Берем имя игрока из уже существующего состояния (State) в памяти
-        String playerName = playGameService.getState(userId).getGame().getPlayerName();
+                    // 2. Отправляем профиль (имя и лучший счет)
+                    this.template.convertAndSendToUser(destinationId, "/queue/playerStat",
+                            new PlayerProfileDTO(
+                                    playerName,
+                                    jsonGameData.optInt("playerbestscore", 0)
+                            ));
 
-        // 3. Запрашиваем статистику из GameService по имени
-        JSONObject jsonGameData = new JSONObject(gameService.getGameData(playerName));
+                    // 3. Отправляем попытки (только число)
+                    this.template.convertAndSendToUser(destinationId, "/queue/playerAttemptsNumber",
+                            new PlayerAttemptsDTO(
+                                    jsonGameData.optInt("playerAttemptsNumber", 0)
+                            ));
 
-        // 1. Отправляем профиль (имя и лучший счет)
-        this.template.convertAndSendToUser(destinationId, "/queue/playerStat",
-                new PlayerProfileDTO(playerName, jsonGameData.getInt("playerbestscore")));
-
-        // 2. Отправляем попытки (только число)
-        this.template.convertAndSendToUser(destinationId, "/queue/playerAttemptsNumber",
-                new PlayerAttemptsDTO(jsonGameData.getInt("playerAttemptsNumber")));
+                    log.info("👤 Профиль игрока {} отправлен", playerName);
+                } catch (Exception e) {
+                    log.error("💥 Ошибка обработки профиля для {}: {}", playerName, e.getMessage());
+                }
+            }
+        });
     }
 
 
@@ -279,34 +284,40 @@ public class TetrisController {
 
     @MessageMapping("/{moveId}")
     public void gamePlayDown(@DestinationVariable String moveId, Principal principal) {
-        // 1. ПОЛУЧАЕМ ID МГНОВЕННО (из токена, проброшенного интерцептором)
         String destinationId = principal.getName();
-        // 2. Распаковываем данные для логики сервисов
-        String[] parts = destinationId.split(":");
-        String userId = parts[0];
-        // 2. Достаем текущее состояние игры из мапы по userId
+        String userId = destinationId.split(":")[0];
+
         var currentState = playGameService.getState(userId);
         if (currentState == null && !moveId.equals("start")) {
-            return; // Защита: если игры нет, а кнопки жмут
+            return;
         }
+
         switch (moveId) {
             case "start" -> {
-                // При старте один раз берем данные из GameService (статистика)
-                // Исправленный второй фрагмент
                 String playerName = currentState.getGame().getPlayerName();
-                String rawData = gameService.getGameData(playerName);
-                if (rawData != null && !rawData.isEmpty()) {
-                    JSONObject jsonGameData = new JSONObject(rawData);
-                    displayService.sendDaoGameToBeDisplayed(
-                            new GameDataDTO(
-                                    jsonGameData.optString("bestplayer", "None"), // Безопасное получение
-                                    jsonGameData.optInt("bestscore", 0)           // Безопасное получение
-                            ),
-                            template,
-                            destinationId
-                    );
-                }
-                // Запуск таймера падения фигур через виртуальные потоки
+
+                // 1. Асинхронно запрашиваем рекорды.
+                // Это не мешает немедленному запуску таймера ниже.
+                gameService.getGameData(playerName).thenAccept(rawData -> {
+                    if (rawData != null && !rawData.isEmpty()) {
+                        try {
+                            JSONObject jsonGameData = new JSONObject(rawData);
+                            displayService.sendDaoGameToBeDisplayed(
+                                    new GameDataDTO(
+                                            jsonGameData.optString("bestplayer", "None"),
+                                            jsonGameData.optInt("bestscore", 0)
+                                    ),
+                                    template,
+                                    destinationId
+                            );
+                        } catch (Exception e) {
+                            log.error("❌ Error parsing game data for {}: {}", playerName, e.getMessage());
+                        }
+                    }
+                });
+
+                // 2. Запуск таймера падения (ScheduledTask в Spring Boot 3.4
+                // при включенных виртуальных потоках тоже работает эффективно)
                 ScheduledFuture<?> task = taskScheduler.scheduleAtFixedRate(
                         () -> displayService.sendStateToBeDisplayed(
                                 playGameService,
@@ -318,17 +329,20 @@ public class TetrisController {
                 );
                 playGameService.setUserTask(userId, task);
             }
-            // В движениях (1, 2, 3, 4) теперь НЕТ запросов к UsersService и GameService
+
+            // Движения остаются синхронными, так как они работают только с памятью (мапой состояний)
             case "1" -> playGameService.setState(playGameService.rotateState(currentState, userId), userId);
             case "2" -> playGameService.setState(playGameService.moveLeftState(currentState, userId), userId);
             case "3" -> playGameService.setState(playGameService.moveRightState(currentState, userId), userId);
             case "4" -> playGameService.setState(playGameService.dropDownState(currentState, userId), userId);
         }
-        // Отправляем обновленное состояние на фронт (кроме "start", там свой планировщик)
+
+        // Отправляем визуал (кроме start, так как там работает планировщик)
         if (!moveId.equals("start")) {
             displayService.sendStateToBeDisplayed(playGameService, gameService, template, destinationId);
         }
     }
+
 
     @MessageMapping("/save")
     public void gameSave(Principal principal) {
@@ -372,37 +386,48 @@ public class TetrisController {
 
     @MessageMapping("/snapShot")
     public void makeSnapShot(Principal principal) {
-        // 1. ПОЛУЧАЕМ ID МГНОВЕННО (из токена, проброшенного интерцептором)
+        if (principal == null) return;
         String destinationId = principal.getName();
-        // 2. Распаковываем данные для логики сервисов
-        String[] parts = destinationId.split(":");
-        String userId = parts[0];
+        String userId = destinationId.split(":")[0];
 
-        // 2. Берем состояние из памяти (State уже должен быть создан в /hello)
         var currentState = playGameService.getState(userId);
         if (currentState == null) return;
-
         String playerName = currentState.getGame().getPlayerName();
 
-        // 3. Получаем данные о рекордах из GameService по имени игрока
-        JSONObject jsonGameData = new JSONObject(gameService.getGameData(playerName));
-        String bestPlayer = jsonGameData.getString("bestplayer");
-        int bestScore = jsonGameData.getInt("bestscore");
+        // 1. Запрашиваем данные асинхронно
+        gameService.getGameData(playerName).thenAccept(rawData -> {
+            if (rawData == null || rawData.isEmpty()) return;
 
-        // 4. Делаем обычный скриншот
-        gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", playGameService, currentState, bestPlayer, bestScore);
-        mongoService.cleanImageMongodb(playerName, "deskTopSnapShot");
-        mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShot");
+            try {
+                JSONObject jsonGameData = new JSONObject(rawData);
+                String bestPlayer = jsonGameData.optString("bestplayer", "None");
+                int bestScore = jsonGameData.optInt("bestscore", 0);
+                int playerBestScore = jsonGameData.optInt("playerbestscore", 0);
 
-        // 5. Если побит личный рекорд — делаем "Best" скриншот
-        if (currentState.getGame().getPlayerScore() >= jsonGameData.getInt("playerbestscore")) {
-            gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", playGameService, currentState, bestPlayer, bestScore);
-            mongoService.cleanImageMongodb(playerName, "deskTopSnapShotBest");
-            mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShotBest");
-        }
+                // 2. Делаем обычный скриншот (в виртуальном потоке это дешево)
+                gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", playGameService, currentState, bestPlayer, bestScore);
 
-        // 6. Отправляем финальный экран на фронт
-        displayService.sendFinalStateToBeDisplayed(playGameService, template, destinationId);
+                // Эти методы помечены @Async, они сами запустят свои виртуальные потоки
+                mongoService.cleanImageMongodb(playerName, "deskTopSnapShot");
+                mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShot");
+
+                // 3. Если побит личный рекорд — делаем "Best" скриншот
+                if (currentState.getGame().getPlayerScore() >= playerBestScore) {
+                    gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", playGameService, currentState, bestPlayer, bestScore);
+                    mongoService.cleanImageMongodb(playerName, "deskTopSnapShotBest");
+                    mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShotBest");
+                }
+
+                // 4. Отправляем финальный экран (теперь это не блокирует основной поток)
+                displayService.sendFinalStateToBeDisplayed(playGameService, template, destinationId);
+
+                log.info("📸 Скриншоты для {} успешно обработаны", playerName);
+
+            } catch (Exception e) {
+                log.error("💥 Ошибка при создании скриншотов для {}: {}", playerName, e.getMessage());
+            }
+        });
     }
+
 
 }
