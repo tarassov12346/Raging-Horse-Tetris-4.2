@@ -5,44 +5,62 @@ import com.app.game.tetris.model.*;
 import com.app.game.tetris.tetriservice.PlayGameService;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.stream.IntStream;
 
 @Service
 public class PlayGame implements PlayGameService {
+    private static final Logger log = LoggerFactory.getLogger(PlayGame.class);
     @Value("${width}") int WIDTH;
     @Value("${height}") int HEIGHT;
 
-    // Hazelcast Map для состояний
+    private final TaskScheduler taskScheduler;
     private final IMap<String, State> userStates;
-    // Инжектим HazelcastInstance через конструктор
-    public PlayGame(HazelcastInstance hazelcastInstance) {
+
+    // Внедряем зависимости через один конструктор
+    public PlayGame(TaskScheduler taskScheduler, HazelcastInstance hazelcastInstance) {
+        this.taskScheduler = taskScheduler;
         this.userStates = hazelcastInstance.getMap("user-states");
     }
+    // Храним не экзекуторы, а Future задачи (чтобы можно было отменить)
+    private final ConcurrentHashMap<String, ScheduledFuture<?>> userTasks = new ConcurrentHashMap<>();
 
-    private final ConcurrentHashMap<String, ScheduledExecutorService> userExecutors = new ConcurrentHashMap<>();
 
-    public void removeStateForUser(String userId) {
-        userStates.remove(userId);
-        ScheduledExecutorService executor = userExecutors.remove(userId);
-        if (executor != null) {
-            executor.shutdown();
+
+    public void setUserTask(String userId, ScheduledFuture<?> task) {
+        userTasks.put(userId, task);
+    }
+
+    public void stopUserTask(String userId) {
+        // .remove() сразу достает задачу и удаляет её из мапы
+        ScheduledFuture<?> task = userTasks.remove(userId);
+
+        if (task != null) {
+            // cancel(true) останавливает выполнение, даже если поток "спит"
+            boolean cancelled = task.cancel(true);
+
+            if (cancelled) {
+                log.info("Loom-таск для пользователя {} успешно остановлен", userId);
+            }
+        } else {
+            log.warn("Попытка остановить таск для {}, но активных задач не найдено", userId);
         }
     }
 
-    @Override
-    public ScheduledExecutorService getSEService(String userId) {
-        return userExecutors.get(userId);
-    }
-
-    @Override
-    public void setSEService(ScheduledExecutorService service, String userId) {
-        userExecutors.put(userId, service);
+    public void removeStateForUser(String userId) {
+        userStates.remove(userId);
+        ScheduledFuture<?> task = userTasks.remove(userId);
+        if (task != null) {
+            task.cancel(false); // Мягко останавливаем таймер падения фигур
+        }
     }
 
     @Override
@@ -56,22 +74,36 @@ public class PlayGame implements PlayGameService {
     }
 
     @Override
-    public State createStateAfterMoveDown(State state, ScheduledExecutorService service, GameService gameService, String userId) {
+    public State createStateAfterMoveDown(State state, GameService gameService, String userId) {
         Optional<State> moveDownState = moveDownState(state);
+
         if (moveDownState.isEmpty()) {
             Optional<State> newTetraminoState = newTetraminoState(state);
+
             if (newTetraminoState.isEmpty()) {
+                // GAME OVER - фигур больше нет
                 state = buildState(state.getStage(), false, state.getGame());
-                if (!service.isShutdown()) gameService.doRecord(state.getGame());
-                service.shutdown();
+
+                // Сохраняем рекорд
+                gameService.doRecord(state.getGame());
+
+                // ОСТАНАВЛИВАЕМ ТАЙМЕР (Loom-way)
+                // Вызываем метод, который мы создали в PlayGameService для очистки ресурсов
+                this.removeStateForUser(userId);
+
                 setState(state, userId);
                 return getState(userId);
-            } else state = newTetraminoState.orElse(state);
+            } else {
+                state = newTetraminoState.orElse(state);
+            }
+        } else {
+            state = moveDownState.orElse(state);
         }
-        state = moveDownState.orElse(state);
+
         setState(state, userId);
         return getState(userId);
     }
+
 
     @Override
     public Game createGame(String playerName, int playerScore) {

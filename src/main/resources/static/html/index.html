@@ -130,25 +130,29 @@
     }
 
     function showState(state) {
-        var json = JSON.parse(state);
+        // Парсим JSON (если WebSocket не сделал этого автоматически)
+        var json = typeof state === 'string' ? JSON.parse(state) : state;
+
+        // Поля теперь берутся напрямую из рекорда GameStateDTO
         var status = json.running;
-        var currentScore = json.game.playerScore;
+        var currentScore = json.playerScore;
 
-
-         console.log('SHOWING STATE');
+        console.log('SHOWING STATE');
 
         if (currentScore > score) {
             playSound('score_sound');
             score = currentScore;
         }
 
-        $("#playerBox").text(json.game.playerName);
+        // Обращаемся напрямую к полям рекорда
+        $("#playerBox").text(json.playerName);
         $("#playerScoreBox").text(score);
         $("#tetrisSpeedBox").text('TETRIS at speed ' + (Math.floor(score / 10) + 1));
 
         if (status) {
             $("#gameStatusBox").text('Game status: ON');
-            updateMatrix(json.stage.cells);
+            // В рекорде поле cells лежит в корне, а не в stage
+            updateMatrix(json.cells);
         } else {
             $("#gameStatusBox").text('Game status: PLS WAIT!!!');
             if (!isGameOverSoundPlayed) {
@@ -159,31 +163,52 @@
         }
     }
 
+
     function showFinalState(state) {
-        var json = JSON.parse(state);
+        // Парсим JSON, если данные пришли строкой
+        var json = typeof state === 'string' ? JSON.parse(state) : state;
+
         $("#gameStatusBox").text('Game status: OVER');
-        updateMatrix(json.stage.cells);
+
+        // В рекорде GameStateDTO поле cells лежит напрямую в json
+        updateMatrix(json.cells);
+
         $("#newGameButton").prop("disabled", false);
 
         if (!isGameOverSoundPlayed) {
             playSound('registered_sound');
             isGameOverSoundPlayed = true;
         }
-        // Переход на страницу результата через 3 секунды
-   //     setTimeout(() => { window.location.href = "/html/snapShot.html"; }, 3000);
+
+        // Переход на страницу результата через 3 секунды (если нужно)
+        // setTimeout(() => { window.location.href = "/html/snapShot.html"; }, 3000);
     }
 
+
     function showSavedState(state) {
-        var json = JSON.parse(state);
+        // Парсим JSON, если данные пришли строкой
+        var json = typeof state === 'string' ? JSON.parse(state) : state;
+
         $("#gameStatusBox").text('Game is Saved!!!');
-        updateMatrix(json.stage.cells);
+
+        // В рекорде GameStateDTO поле cells лежит напрямую в json, а не в stage
+        updateMatrix(json.cells);
+
         alert("Game saved successfully!");
     }
 
-    function showDaoGame(game) {
-        var json = JSON.parse(game);
-        $("#bestPlayerBox").text(json.playerName);
-        $("#bestPlayerScoreBox").text(json.playerScore);
+
+    // А вот логику внутри showDaoGame нужно обновить под поля Рекорда:
+    function showDaoGame(message) {
+        const data = JSON.parse(message);
+
+        // Используем поля из твоего GameDataDTO: bestPlayer и bestScore
+        $("#bestPlayerBox").text(`${data.bestPlayer || 'None'}`);
+        $("#bestPlayerScoreBox").text(`${data.bestScore || 0}`);
+
+        // Если у тебя там была еще какая-то логика отрисовки,
+        // убедись, что она тоже использует новые имена полей.
+        console.log("Received Record data:", data);
     }
 
     // Инициализация таблицы при загрузке

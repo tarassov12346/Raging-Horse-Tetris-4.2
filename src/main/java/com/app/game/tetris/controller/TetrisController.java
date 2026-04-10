@@ -1,8 +1,7 @@
 package com.app.game.tetris.controller;
 
 import com.app.game.tetris.displayservice.DisplayService;
-import com.app.game.tetris.dto.PlayerAttemptsDTO;
-import com.app.game.tetris.dto.PlayerProfileDTO;
+import com.app.game.tetris.dto.*;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Roles;
@@ -18,24 +17,25 @@ import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.io.OutputStream;
 import java.security.Principal;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
-
-import java.util.concurrent.TimeUnit;
 
 @Controller
 public class TetrisController {
     private static final Logger log = LoggerFactory.getLogger(TetrisController.class);
 
+    private final TaskScheduler taskScheduler; // Помечаем final для надежности
     private final PlayGameService playGameService;
     private final SimpMessagingTemplate template;
     private final UsersService usersService;
@@ -44,7 +44,18 @@ public class TetrisController {
     private final MongoService mongoService;
     private final DisplayService displayService;
 
-    public TetrisController(PlayGameService playGameService, SimpMessagingTemplate template, UsersService usersService, GameArtefactService gameArtefactService, GameService gameService, MongoService mongoService, DisplayService displayService) {
+    // В Spring 4.3+ аннотация @Autowired над конструктором не обязательна, если он один
+    public TetrisController(
+            TaskScheduler taskScheduler,
+            PlayGameService playGameService,
+            SimpMessagingTemplate template,
+            UsersService usersService,
+            GameArtefactService gameArtefactService,
+            GameService gameService,
+            MongoService mongoService,
+            DisplayService displayService
+    ) {
+        this.taskScheduler = taskScheduler;
         this.playGameService = playGameService;
         this.template = template;
         this.usersService = usersService;
@@ -89,14 +100,21 @@ public class TetrisController {
             String rawData = gameService.getGameData(username);
             if (rawData != null && !rawData.isEmpty()) {
                 JSONObject jsonGameData = new JSONObject(rawData);
+
+                // Создаем рекорд напрямую из данных JSON
+                GameDataDTO gameDataRecord = new GameDataDTO(
+                        jsonGameData.optString("bestplayer", "None"),
+                        jsonGameData.optInt("bestscore", 0)
+                );
+
+                // Передаем рекорд в метод (сигнатуру которого мы поправили ранее)
                 displayService.sendDaoGameToBeDisplayed(
-                        playGameService.createGame(
-                                jsonGameData.optString("bestplayer", "None"),
-                                jsonGameData.optInt("bestscore", 0)
-                        ),
-                        template, destinationId
+                        gameDataRecord,
+                        template,
+                        destinationId
                 );
             }
+
 
             log.info("✅ Инициализация завершена для: {}", username);
 
@@ -188,32 +206,37 @@ public class TetrisController {
             e.printStackTrace();
         }
     }
+
     @MessageMapping("/admin")
     public void admin(Principal principal) {
-        // 1. (Опционально) Проверка прав: только если Гейтвей прокидывает роли в Principal
-        // Если проверки на уровне Gateway достаточно, можно пропустить.
-
-        // 2. Запрос списка пользователей из микросервиса USERS
-        // Здесь usersService должен быть не репозиторием, а Feign-клиентом или Rest-шаблоном
+        // 1. Получаем список всех пользователей через Feign/Service
         List<Users> allUsersList = usersService.getAllUsers();
-
         allUsersList.forEach(user -> {
-            // Формируем объект для фронта (пароль лучше вообще не слать, даже зашифрованный)
+            // 2. Формируем строку ролей
             String rolesString = user.getRoles().stream()
                     .map(Roles::getName)
                     .collect(Collectors.joining(";"));
-
-            this.template.convertAndSend("/topic/users",
-                    new Users(user.getId(), user.getUsername(), "[PROTECTED]", rolesString, user.getRoles()));
+            // Проверяем, есть ли роль ADMIN (для флага в DTO)
+            boolean isAdmin = rolesString.contains("ADMIN");
+            // 3. Создаем рекорд и отправляем его
+            UserResponseDTO userDto = new UserResponseDTO(
+                    user.getId(),
+                    user.getUsername(),
+                    rolesString,
+                    isAdmin
+            );
+            this.template.convertAndSend("/topic/users", userDto);
         });
-
-
         gameService.getAllBestResults(gameService.getAllGames())
-                .forEach(game -> System.out.println(game.getPlayerName()+"  "+ game.getPlayerScore()));
-
-        // 3. Своя родная статистика Тетриса остается как была
-        gameService.getAllBestResults(gameService.getAllGames())
-                .forEach(game -> this.template.convertAndSend("/topic/results", game));
+                .forEach(game -> {
+                    // Используем новое имя класса GameRecord
+                    GameRecord recordDto = new GameRecord(
+                            game.getId(),
+                            game.getPlayerName(),
+                            game.getPlayerScore()
+                    );
+                    this.template.convertAndSend("/topic/results", recordDto);
+                });
     }
 
     @MessageMapping("/admin/{targetUserId}")
@@ -226,38 +249,33 @@ public class TetrisController {
         String username = (parts.length > 1) ? parts[1] : "Player_" + userId;
         // 1. Проверяем роль через Authorities (которые заполнил Interceptor из JWT)
         // Либо, если ты просто прокинул заголовок X-User-Role, проверяем его.
-        boolean isAdmin = usersService.findUserByUserName(username).getRoles().stream() .anyMatch(a -> a.getName().equals("ROLE_ADMIN"));
+        boolean isAdmin = usersService.findUserByUserName(username).getRoles().stream().anyMatch(a -> a.getName().equals("ROLE_ADMIN"));
         System.out.println(isAdmin);
         if (!isAdmin) {
-            this.template.convertAndSendToUser(destinationId,"/queue/alert", "You are not admin!");
+            this.template.convertAndSendToUser(destinationId, "/queue/alert", "You are not admin!");
             return;
         }
         // 2. Проверка "не удаляй себя" по ID (теперь оба значения — это ID)
         String currentAdminId = userId;
         if (currentAdminId.equals(String.valueOf(targetUserId))) {
-            this.template.convertAndSendToUser(destinationId,"/queue/alert", "You cannot delete yourself!");
+            this.template.convertAndSendToUser(destinationId, "/queue/alert", "You cannot delete yourself!");
             return;
         }
-
         // 3. Получаем имя удаляемого пользователя (нужно для очистки Mongo/GameService)
         // Здесь usersService — это Feign-клиент к микросервису USERS
         Users targetUser = usersService.findUserById(targetUserId);
         String targetUsername = targetUser.getUsername();
-
         // 4. Очистка игровых данных (локально в Тетрисе/Монго)
         mongoService.cleanSavedGameMongodb(targetUsername);
         mongoService.cleanImageMongodb(targetUsername, "");
         mongoService.cleanImageMongodb(targetUsername, "deskTopSnapShot");
         mongoService.cleanImageMongodb(targetUsername, "deskTopSnapShotBest");
         gameService.deleteGameData(targetUsername);
-
         // 5. Удаление самого пользователя в микросервисе USERS
         usersService.deleteUser(targetUserId);
-
         // 6. Обновляем список для всех админов
         admin(principal);
     }
-
 
     @MessageMapping("/{moveId}")
     public void gamePlayDown(@DestinationVariable String moveId, Principal principal) {
@@ -274,40 +292,31 @@ public class TetrisController {
         switch (moveId) {
             case "start" -> {
                 // При старте один раз берем данные из GameService (статистика)
+                // Исправленный второй фрагмент
                 String playerName = currentState.getGame().getPlayerName();
-                JSONObject jsonGameData = new JSONObject(gameService.getGameData(playerName));
-
-                displayService.sendDaoGameToBeDisplayed(
-                        playGameService.createGame(jsonGameData.getString("bestplayer"), jsonGameData.getInt("bestscore")),
-                        template, destinationId
+                String rawData = gameService.getGameData(playerName);
+                if (rawData != null && !rawData.isEmpty()) {
+                    JSONObject jsonGameData = new JSONObject(rawData);
+                    displayService.sendDaoGameToBeDisplayed(
+                            new GameDataDTO(
+                                    jsonGameData.optString("bestplayer", "None"), // Безопасное получение
+                                    jsonGameData.optInt("bestscore", 0)           // Безопасное получение
+                            ),
+                            template,
+                            destinationId
+                    );
+                }
+                // Запуск таймера падения фигур через виртуальные потоки
+                ScheduledFuture<?> task = taskScheduler.scheduleAtFixedRate(
+                        () -> displayService.sendStateToBeDisplayed(
+                                playGameService,
+                                gameService,
+                                template,
+                                destinationId
+                        ),
+                        Duration.ofMillis(1000)
                 );
- /*               Thread.ofVirtual().start(() -> {
-                    try {
-                        while (!Thread.interrupted()) {
-                            displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, destinationId);
-                            Thread.sleep(java.time.Duration.ofMillis(1000)); // Замена через Duration
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                });*/
-
-  /*              // Создаем планировщик, который для каждой задачи спавнит виртуальный поток
-                var scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
-
-                playGameService.setSEService(scheduler, userId);
-                playGameService.getSEService(userId).scheduleAtFixedRate(
-                        () -> displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, destinationId),
-                0, 1000, TimeUnit.MILLISECONDS
-);*/
-
-
-                // Запуск таймера падения фигур
-                playGameService.setSEService(Executors.newScheduledThreadPool(1), userId);
-                playGameService.getSEService(userId).scheduleAtFixedRate(
-                        () -> displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, destinationId),
-                        0, 1000, TimeUnit.MILLISECONDS
-                );
+                playGameService.setUserTask(userId, task);
             }
             // В движениях (1, 2, 3, 4) теперь НЕТ запросов к UsersService и GameService
             case "1" -> playGameService.setState(playGameService.rotateState(currentState, userId), userId);
@@ -317,34 +326,24 @@ public class TetrisController {
         }
         // Отправляем обновленное состояние на фронт (кроме "start", там свой планировщик)
         if (!moveId.equals("start")) {
-            displayService.sendStateToBeDisplayed(playGameService, gameService, playGameService.getSEService(userId), template, destinationId);
+            displayService.sendStateToBeDisplayed(playGameService, gameService, template, destinationId);
         }
     }
 
     @MessageMapping("/save")
     public void gameSave(Principal principal) {
-        // 1. ПОЛУЧАЕМ ID МГНОВЕННО (из токена, проброшенного интерцептором)
         String destinationId = principal.getName();
-        // 2. Распаковываем данные для логики сервисов
-        String[] parts = destinationId.split(":");
-        String userId = parts[0];
-
-        // 2. Останавливаем игровой цикл (падающие фигуры) для этого юзера
-        if (playGameService.getSEService(userId) != null) {
-            playGameService.getSEService(userId).shutdown();
-        }
-
-        // 3. Получаем текущее состояние и сохраняем
+        String userId = destinationId.split(":")[0];
+        // 1. Сначала забираем текущее состояние игры
         var currentState = playGameService.getState(userId);
         if (currentState != null) {
+            // 2. Сохраняем логику в SavedGame
             SavedGame savedGame = playGameService.saveGame(currentState.getGame(), currentState);
-
-            // Отправляем в микросервис Монго
+            // Отправляем в Монго
             mongoService.saveGame(savedGame);
-
-            // Уведомляем фронт о сохранении
-            displayService.sendSavedStateToBeDisplayed(playGameService, gameService,
-                    playGameService.getSEService(userId), template, destinationId);
+            playGameService.stopUserTask(userId);
+            // Уведомляем фронт
+            displayService.sendSavedStateToBeDisplayed(playGameService, template, destinationId);
         }
     }
 
@@ -355,23 +354,16 @@ public class TetrisController {
         // 2. Распаковываем данные для логики сервисов
         String[] parts = destinationId.split(":");
         String userId = parts[0];
-
-        // 2. Берем текущее состояние (в нем уже сидит имя игрока)
-        var currentState = playGameService.getState(userId);
-        if (currentState == null) return; // Защита, если игры еще нет
-
-        String playerName = currentState.getGame().getPlayerName();
-
+        String playerName = (parts.length > 1) ? parts[1] : "Player_" + userId;
+        log.info("RESTARTED for " + playerName);
         // 3. Запрашиваем у Монго сохраненную игру по имени
         mongoService.gameRestart(playerName).ifPresent(savedGame -> {
             // Восстанавливаем состояние из сохраненки
             playGameService.setState(playGameService.recreateStateFromSavedGame(savedGame, userId), userId);
-
             // Отправляем обновленный экран на фронт
             displayService.sendStateToBeDisplayed(
                     playGameService,
                     gameService,
-                    playGameService.getSEService(userId),
                     template,
                     destinationId
             );
@@ -410,8 +402,7 @@ public class TetrisController {
         }
 
         // 6. Отправляем финальный экран на фронт
-        displayService.sendFinalStateToBeDisplayed(playGameService, gameService,
-                playGameService.getSEService(userId), template, destinationId);
+        displayService.sendFinalStateToBeDisplayed(playGameService, template, destinationId);
     }
 
 }

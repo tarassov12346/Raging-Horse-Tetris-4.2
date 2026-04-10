@@ -83,16 +83,21 @@
             console.log('Connected via Gateway');
             setConnected(true);
 
-            // Подписки на персональные очереди
+            // Подписки на общее
             stompClient.subscribe('/topic/daoGameObjects', (msg) => {
                 const data = JSON.parse(msg.body);
-                $("#bestPlayerBox").text(`Wanna challenge ${data.playerName || 'None'}?`);
-                $("#bestScoreBox").text(`with score ${data.playerScore || 0}`);
+
+                // Используем имена полей из твоего Java Record: bestPlayer и bestScore
+                $("#bestPlayerBox").text(`Wanna challenge ${data.bestPlayer || 'None'}?`);
+                $("#bestScoreBox").text(`with score ${data.bestScore || 0}`);
             });
+
 
             stompClient.subscribe('/user/queue/gameObjects', (msg) => {
                 const data = JSON.parse(msg.body);
+          // data.playerName теперь берется напрямую из рекорда
                 $("#helloBox").text(`Hello ${data.playerName || 'Player'}! WELCOME!`);
+
             });
 
             // Уведомляем сервер. Сервер возьмет UserID из Principal (из токена)

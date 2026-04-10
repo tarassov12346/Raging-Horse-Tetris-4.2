@@ -145,17 +145,27 @@
     }
 
     function showUsers(usersData) {
-        const user = JSON.parse(usersData);
-        // Используем passwordConfirm для ролей, как в твоей логике
-        const roles = user.passwordConfirm || "USER";
+        // Если данные приходят строкой (JSON), парсим.
+        // Если WebSocket уже отдал объект, parse не нужен.
+        const user = typeof usersData === 'string' ? JSON.parse(usersData) : usersData;
 
-        $("#users tbody").append(`<tr>
+        // Теперь используем чёткие имена полей из нашего Record DTO:
+        // user.id, user.username, user.roles
+        const displayRoles = user.roles || "USER";
+
+        $("#users tbody").append(`
+        <tr id="user-row-${user.id}">
             <td>${user.id}</td>
             <td>${user.username}</td>
-            <td>******</td>
-            <td>${roles}</td>
-            <td><button class="btn-delete" onclick="deleteUser(${user.id})">DELETE</button></td>
-        </tr>`);
+            <td>*</td> <!-- Пароль в DTO больше не передаем из соображений безопасности -->
+            <td>${displayRoles}</td>
+            <td>
+                <button class="btn-delete" onclick="deleteUser(${user.id})">
+                    DELETE
+                </button>
+            </td>
+        </tr>
+    `);
     }
 
     function deleteUser(id) {
@@ -169,12 +179,15 @@
     }
 
     function showResults(gameData) {
-        const res = JSON.parse(gameData);
-        $("#results tbody").append(`<tr>
+        const res = typeof gameData === 'string' ? JSON.parse(gameData) : gameData;
+
+        $("#results tbody").append(`
+        <tr>
             <td>${res.id}</td>
             <td>${res.playerName}</td>
             <td>${res.playerScore}</td>
-        </tr>`);
+        </tr>
+    `);
     }
 
     $(function () {
