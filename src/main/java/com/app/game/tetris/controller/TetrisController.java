@@ -27,7 +27,6 @@ import java.security.Principal;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
@@ -68,11 +67,9 @@ public class TetrisController {
     @MessageMapping("/hello")
     public void hello(Principal principal) {
         if (principal == null) return;
-
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
         String username = (destinationId.contains(":")) ? destinationId.split(":")[1] : "Player_" + userId;
-
         try {
             // 1. Инициализация (синхронно, так как это база для состояния)
             var gameState = playGameService.initiateState(username, userId);
@@ -102,15 +99,11 @@ public class TetrisController {
                     }
                 }
             });
-
             log.info("🚀 Основная инициализация завершена для: {}", username);
         } catch (Exception e) {
             log.error("💥 Ошибка в hello: {}", e.getMessage());
         }
     }
-
-
-
 
     @MessageMapping("/profile")
     public void profile(Principal principal) {
@@ -126,7 +119,6 @@ public class TetrisController {
             return;
         }
         String playerName = state.getGame().getPlayerName();
-
         // 1. Асинхронный вызов микросервиса через CompletableFuture
         gameService.getGameData(playerName).thenAccept(rawData -> {
             if (rawData != null && !rawData.isEmpty()) {
@@ -139,7 +131,6 @@ public class TetrisController {
                                     playerName,
                                     jsonGameData.optInt("playerbestscore", 0)
                             ));
-
                     // 3. Отправляем попытки (только число)
                     this.template.convertAndSendToUser(destinationId, "/queue/playerAttemptsNumber",
                             new PlayerAttemptsDTO(
@@ -153,7 +144,6 @@ public class TetrisController {
             }
         });
     }
-
 
     @MessageMapping("/upload")
     public void upload(String imageBase64Stringsep, Principal principal) {
@@ -172,7 +162,6 @@ public class TetrisController {
         byte[] imageBytes = Base64.getDecoder().decode(imageBase64Stringsep);
         mongoService.loadMugShotIntoMongodb(playerName, imageBytes);
     }
-
 
     @GetMapping("/getPhoto")
     public void getPhoto(@RequestHeader("X-User-Id") String userId, HttpServletResponse response) {
@@ -198,12 +187,10 @@ public class TetrisController {
     // Вспомогательный метод для чистоты кода
     private void writeImageToResponse(HttpServletResponse response, byte[] image) {
         if (image == null) return;
-
         response.setHeader("Accept-ranges", "bytes");
         response.setContentType("image/jpeg");
         response.setContentLength(image.length);
         response.setHeader("Cache-Control", "must-revalidate, post-check=0, pre-check=0");
-
         try (OutputStream out = response.getOutputStream()) {
             out.write(image);
             out.flush();
@@ -286,16 +273,13 @@ public class TetrisController {
     public void gamePlayDown(@DestinationVariable String moveId, Principal principal) {
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
-
         var currentState = playGameService.getState(userId);
         if (currentState == null && !moveId.equals("start")) {
             return;
         }
-
         switch (moveId) {
             case "start" -> {
                 String playerName = currentState.getGame().getPlayerName();
-
                 // 1. Асинхронно запрашиваем рекорды.
                 // Это не мешает немедленному запуску таймера ниже.
                 gameService.getGameData(playerName).thenAccept(rawData -> {
@@ -315,7 +299,6 @@ public class TetrisController {
                         }
                     }
                 });
-
                 // 2. Запуск таймера падения (ScheduledTask в Spring Boot 3.4
                 // при включенных виртуальных потоках тоже работает эффективно)
                 ScheduledFuture<?> task = taskScheduler.scheduleAtFixedRate(
@@ -329,20 +312,17 @@ public class TetrisController {
                 );
                 playGameService.setUserTask(userId, task);
             }
-
             // Движения остаются синхронными, так как они работают только с памятью (мапой состояний)
             case "1" -> playGameService.setState(playGameService.rotateState(currentState, userId), userId);
             case "2" -> playGameService.setState(playGameService.moveLeftState(currentState, userId), userId);
             case "3" -> playGameService.setState(playGameService.moveRightState(currentState, userId), userId);
             case "4" -> playGameService.setState(playGameService.dropDownState(currentState, userId), userId);
         }
-
         // Отправляем визуал (кроме start, так как там работает планировщик)
         if (!moveId.equals("start")) {
             displayService.sendStateToBeDisplayed(playGameService, gameService, template, destinationId);
         }
     }
-
 
     @MessageMapping("/save")
     public void gameSave(Principal principal) {
@@ -389,45 +369,43 @@ public class TetrisController {
         if (principal == null) return;
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
-
         var currentState = playGameService.getState(userId);
         if (currentState == null) return;
         String playerName = currentState.getGame().getPlayerName();
-
         // 1. Запрашиваем данные асинхронно
         gameService.getGameData(playerName).thenAccept(rawData -> {
             if (rawData == null || rawData.isEmpty()) return;
-
             try {
                 JSONObject jsonGameData = new JSONObject(rawData);
                 String bestPlayer = jsonGameData.optString("bestplayer", "None");
                 int bestScore = jsonGameData.optInt("bestscore", 0);
                 int playerBestScore = jsonGameData.optInt("playerbestscore", 0);
-
                 // 2. Делаем обычный скриншот (в виртуальном потоке это дешево)
                 gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", playGameService, currentState, bestPlayer, bestScore);
-
                 // Эти методы помечены @Async, они сами запустят свои виртуальные потоки
                 mongoService.cleanImageMongodb(playerName, "deskTopSnapShot");
                 mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShot");
-
                 // 3. Если побит личный рекорд — делаем "Best" скриншот
                 if (currentState.getGame().getPlayerScore() >= playerBestScore) {
                     gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", playGameService, currentState, bestPlayer, bestScore);
                     mongoService.cleanImageMongodb(playerName, "deskTopSnapShotBest");
                     mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShotBest");
                 }
-
                 // 4. Отправляем финальный экран (теперь это не блокирует основной поток)
                 displayService.sendFinalStateToBeDisplayed(playGameService, template, destinationId);
-
                 log.info("📸 Скриншоты для {} успешно обработаны", playerName);
-
             } catch (Exception e) {
                 log.error("💥 Ошибка при создании скриншотов для {}: {}", playerName, e.getMessage());
             }
         });
     }
 
-
+    @MessageMapping("/record")
+    public void makeRecord(Principal principal) {
+        if (principal == null) return;
+        String destinationId = principal.getName();
+        String userId = destinationId.split(":")[0];
+        gameService.doRecord(playGameService.getState(userId).getGame());
+        log.info("record to DB is made for " + userId);
+    }
 }

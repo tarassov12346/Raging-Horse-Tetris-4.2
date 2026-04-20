@@ -19,8 +19,10 @@ import java.util.stream.IntStream;
 @Service
 public class PlayGame implements PlayGameService {
     private static final Logger log = LoggerFactory.getLogger(PlayGame.class);
-    @Value("${width}") int WIDTH;
-    @Value("${height}") int HEIGHT;
+    @Value("${width}")
+    int WIDTH;
+    @Value("${height}")
+    int HEIGHT;
 
     private final TaskScheduler taskScheduler;
     private final IMap<String, State> userStates;
@@ -30,19 +32,19 @@ public class PlayGame implements PlayGameService {
         this.taskScheduler = taskScheduler;
         this.userStates = hazelcastInstance.getMap("user-states");
     }
+
     // Храним не экзекуторы, а Future задачи (чтобы можно было отменить)
     private final ConcurrentHashMap<String, ScheduledFuture<?>> userTasks = new ConcurrentHashMap<>();
 
-
-
+    @Override
     public void setUserTask(String userId, ScheduledFuture<?> task) {
         userTasks.put(userId, task);
     }
 
+    @Override
     public void stopUserTask(String userId) {
         // .remove() сразу достает задачу и удаляет её из мапы
         ScheduledFuture<?> task = userTasks.remove(userId);
-
         if (task != null) {
             // cancel(true) останавливает выполнение, даже если поток "спит"
             boolean cancelled = task.cancel(true);
@@ -55,6 +57,7 @@ public class PlayGame implements PlayGameService {
         }
     }
 
+    @Override
     public void removeStateForUser(String userId) {
         userStates.remove(userId);
         ScheduledFuture<?> task = userTasks.remove(userId);
@@ -76,21 +79,16 @@ public class PlayGame implements PlayGameService {
     @Override
     public State createStateAfterMoveDown(State state, GameService gameService, String userId) {
         Optional<State> moveDownState = moveDownState(state);
-
         if (moveDownState.isEmpty()) {
             Optional<State> newTetraminoState = newTetraminoState(state);
-
             if (newTetraminoState.isEmpty()) {
                 // GAME OVER - фигур больше нет
                 state = buildState(state.getStage(), false, state.getGame());
-
                 // Сохраняем рекорд
-                gameService.doRecord(state.getGame());
-
+                //        gameService.doRecord(state.getGame());
                 // ОСТАНАВЛИВАЕМ ТАЙМЕР (Loom-way)
                 // Вызываем метод, который мы создали в PlayGameService для очистки ресурсов
                 this.removeStateForUser(userId);
-
                 setState(state, userId);
                 return getState(userId);
             } else {
@@ -99,11 +97,9 @@ public class PlayGame implements PlayGameService {
         } else {
             state = moveDownState.orElse(state);
         }
-
         setState(state, userId);
         return getState(userId);
     }
-
 
     @Override
     public Game createGame(String playerName, int playerScore) {

@@ -55,6 +55,9 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
 
     <script>
+
+    let isRecordSent = false; // Глобальный флаг
+
     var stompClient = null;
     var score = 0;
     var isGameOverSoundPlayed = false;
@@ -150,11 +153,18 @@
         $("#tetrisSpeedBox").text('TETRIS at speed ' + (Math.floor(score / 10) + 1));
 
         if (status) {
+            isRecordSent = false; // Сбрасываем при старте новой игры
             $("#gameStatusBox").text('Game status: ON');
             // В рекорде поле cells лежит в корне, а не в stage
             updateMatrix(json.cells);
         } else {
+            if (!isRecordSent) { // Шлем только один раз
+                record();
+                isRecordSent = true;
+            }
             $("#gameStatusBox").text('Game status: PLS WAIT!!!');
+
+
             if (!isGameOverSoundPlayed) {
                 playSound('registered_sound');
                 isGameOverSoundPlayed = true;
@@ -237,7 +247,7 @@
     });
 
     function snapShot() { stompClient.publish({ destination: "/app/snapShot" }); }
-
+    function record() {stompClient.publish({ destination: "/app/record" });}
     function playSound(id) {
         var audio = document.getElementById(id);
         if (!audio) return;
