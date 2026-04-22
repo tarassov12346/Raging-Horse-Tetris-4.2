@@ -219,7 +219,7 @@ public class TetrisController {
             );
             this.template.convertAndSend("/topic/users", userDto);
         });
-        gameService.getAllBestResults(gameService.getAllGames())
+        gameService.getAllGames()
                 .forEach(game -> {
                     // Используем новое имя класса GameRecord
                     GameRecord recordDto = new GameRecord(

@@ -7,11 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -47,14 +44,6 @@ public class GameServiceImpl implements GameService {
     public void doRecord(Game game) {
         log.info("🏆 Сохранение рекорда в фоне...");
         gameClient.doRecord(game);
-    }
-
-    @Override
-    public Set<Game> getAllBestResults(List<Game> playersList) {
-        // Только вычисления — оставляем как есть
-        return playersList.stream()
-                .sorted(Comparator.comparingInt(Game::getPlayerScore).reversed())
-                .collect(Collectors.toSet());
     }
 }
 
