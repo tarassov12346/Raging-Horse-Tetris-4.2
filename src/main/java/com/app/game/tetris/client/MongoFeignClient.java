@@ -19,8 +19,11 @@ public interface MongoFeignClient {
     @DeleteMapping("/delete")
     void cleanSavedGameMongodb(@RequestParam("playerName") String playerName);
 
-    @GetMapping("/prepare")
+    // БЫЛО: @GetMapping("/prepare")
+    // СТАЛО:
+    @PostMapping("/prepare")
     void prepareMongoDBForNewPLayer(@RequestParam("playerName") String playerName);
+
 
     @DeleteMapping("/delete_image")
     void cleanImageMongodb(@RequestParam("playerName") String playerName,
