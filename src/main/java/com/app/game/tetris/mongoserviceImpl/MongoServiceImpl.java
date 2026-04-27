@@ -3,17 +3,13 @@ package com.app.game.tetris.mongoserviceImpl;
 import com.app.game.tetris.client.MongoFeignClient;
 import com.app.game.tetris.model.SavedGame;
 import com.app.game.tetris.mongoservice.MongoService;
+import com.app.service.grpc.*;
 import com.google.protobuf.ByteString;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
-import com.app.service.grpc.SnapshotRequest;
-import com.app.service.grpc.SnapshotResponse;
-import com.app.service.grpc.SnapshotServiceGrpc;
-
 
 
 import java.io.IOException;
@@ -69,7 +65,6 @@ public class MongoServiceImpl implements MongoService {
         }
     }
 
-
     // Этот метод теперь выполнится в отдельном виртуальном потоке
     @Async
     @Override
@@ -77,21 +72,6 @@ public class MongoServiceImpl implements MongoService {
         log.info("🪄 Асинхронная подготовка БД для игрока: {}", playerName);
         mongoFeignClient.prepareMongoDBForNewPLayer(playerName);
     }
-
-    // Сохранение скриншота — тяжелая операция (чтение файла + сеть)
-    // В виртуальном потоке она не "подвесит" основной поток игры
-/*    @Async
-    @Override
-    public void loadSnapShotIntoMongodb(String playerName, String fileName) {
-        String pathToShots = System.getProperty("user.dir") + shotsPath;
-        try {
-            byte[] data = Files.readAllBytes(Path.of(pathToShots + fileName + ".jpg"));
-            mongoFeignClient.loadSnapShotIntoMongodb(playerName, fileName, data);
-            log.info("📸 Скриншот {} сохранен в Mongo", fileName);
-        } catch (IOException e) {
-            log.error("❌ Ошибка чтения файла скриншота: {}", e.getMessage());
-        }
-    }*/
 
     @Async
     @Override
@@ -119,12 +99,21 @@ public class MongoServiceImpl implements MongoService {
     }
 
     @Override
-    public byte[] loadByteArrayFromMongodb(String playerName, String fileName) {
-        return mongoFeignClient.loadByteArrayFromMongodb(playerName, fileName);
+    public void loadMugShotIntoMongodb(String playerName, byte[] data) {
+        MugShotRequest request = MugShotRequest.newBuilder()
+                .setPlayerName(playerName)
+                .setData(ByteString.copyFrom(data))
+                .build();
+        snapshotStub.uploadMugShot(request);
+        log.info("👤 MugShot отправлен через gRPC для {}", playerName);
     }
 
     @Override
-    public void loadMugShotIntoMongodb(String playerName, byte[] data) {
-        mongoFeignClient.loadMugShotIntoMongodb(playerName, data);
+    public byte[] loadByteArrayFromMongodb(String playerName, String fileName) {
+        DownloadRequest request = DownloadRequest.newBuilder()
+                .setPlayerName(playerName)
+                .setFileName(fileName)
+                .build();
+        return snapshotStub.downloadBytes(request).getData().toByteArray();
     }
 }
