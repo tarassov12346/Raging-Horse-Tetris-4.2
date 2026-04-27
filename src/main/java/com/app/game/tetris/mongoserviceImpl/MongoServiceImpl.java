@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -85,13 +87,56 @@ public class MongoServiceImpl implements MongoService {
 
     @Override
     public void saveGame(SavedGame savedGame) {
-        mongoFeignClient.saveGame(savedGame);
+        // Конвертируем char[][] в список строк для gRPC
+        List<String> rows = Arrays.stream(savedGame.getCells())
+                .map(String::new) // Каждую строку чаров в String
+                .toList();
+
+        SaveGameRequest request = SaveGameRequest.newBuilder()
+                .setPlayerName(savedGame.getPlayerName())
+                .setPlayerScore(savedGame.getPlayerScore())
+                .addAllRows(rows) // Добавляем всё поле
+                .build();
+
+        try {
+            snapshotStub.saveGame(request);
+            log.info("💾 Игра игрока {} сохранена через gRPC", savedGame.getPlayerName());
+        } catch (Exception e) {
+            log.error("❌ Ошибка gRPC при сохранении игры: {}", e.getMessage());
+        }
     }
 
     @Override
     public Optional<SavedGame> gameRestart(String playerName) {
-        return mongoFeignClient.gameRestart(playerName);
+        log.info("🔄 Запрос загрузки игры через gRPC для: {}", playerName);
+
+        GetSavedGameRequest request = GetSavedGameRequest.newBuilder()
+                .setPlayerName(playerName)
+                .build();
+
+        try {
+            GetSavedGameResponse response = snapshotStub.getSavedGame(request);
+
+            if (response.getFound()) {
+                // Превращаем список строк gRPC обратно в char[][]
+                char[][] cells = response.getRowsList().stream()
+                        .map(String::toCharArray)
+                        .toArray(char[][]::new);
+
+                SavedGame savedGame = new SavedGame(
+                        response.getPlayerName(),
+                        response.getPlayerScore(),
+                        cells
+                );
+                return Optional.of(savedGame);
+            }
+        } catch (Exception e) {
+            log.error("❌ Ошибка gRPC при загрузке игры: {}", e.getMessage());
+        }
+
+        return Optional.empty();
     }
+
 
     @Override
     public void cleanImageMongodb(String playerName, String fileName) {
