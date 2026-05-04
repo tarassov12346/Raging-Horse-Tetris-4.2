@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package com.app.grpc;
+
+option java_multiple_files = true;
+option java_package = "com.app.service.grpc";
+
+service GameIntegrationService {
+  rpc GetGameScore (PlayerRequest) returns (GameScoreResponse);
+  rpc GetAllGames (Empty) returns (AllGamesResponse);
+  rpc DoRecord (GameRecordRequest) returns (Empty);
+}
+
+message PlayerRequest {
+  string player_name = 1;
+}
+
+message GameScoreResponse {
+  string best_player = 1;
+  int32 best_score = 2;
+  int32 player_best_score = 3;
+  int32 player_attempts_number = 4;
+}
+
+message GameResponse {
+  int64 id = 1;         // Соответствует твоему Long id
+  string player_name = 2;
+  int32 player_score = 3;
+}
+
+message AllGamesResponse {
+  repeated GameResponse games = 1;
+}
+
+
+
+// Новое сообщение
+message GameRecordRequest {
+  string player_name = 1;
+  int32 player_score = 2;
+}
+
+
+message Empty {}

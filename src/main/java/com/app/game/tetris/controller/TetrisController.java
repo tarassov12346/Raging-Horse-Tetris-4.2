@@ -221,6 +221,7 @@ public class TetrisController {
         });
         gameService.getAllGames()
                 .forEach(game -> {
+                    System.out.println("ОТПРАВКА НА ФРОНТ: " + game.getPlayerName() + " - " + game.getPlayerScore());
                     // Используем новое имя класса GameRecord
                     GameRecord recordDto = new GameRecord(
                             game.getId(),
