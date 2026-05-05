@@ -11,55 +11,10 @@ import java.util.Set;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-
 public class Users {
     private Long id;
-
     private String username;
-
     private String password;
-
     private String passwordConfirm;
-
     private Set<Roles> roles;
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public void setPasswordConfirm(String passwordConfirm) {
-        this.passwordConfirm = passwordConfirm;
-    }
-
-    public void setRoles(Set<Roles> roles) {
-        this.roles = roles;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public String getPasswordConfirm() {
-        return passwordConfirm;
-    }
-
-    public Set<Roles> getRoles() {
-        return roles;
-    }
 }
