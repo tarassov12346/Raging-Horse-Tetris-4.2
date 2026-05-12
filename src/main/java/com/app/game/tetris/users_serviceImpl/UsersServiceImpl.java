@@ -8,10 +8,6 @@ import io.grpc.StatusRuntimeException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,21 +17,10 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class UsersServiceImpl implements UsersService, UserDetailsService {
+public class UsersServiceImpl implements UsersService{
 
     @GrpcClient("users-service")
     private UserServiceGrpc.UserServiceBlockingStub userStub;
-
-    @Override
-    public boolean saveUser(Users newUser) {
-        try {
-            ActionResponse response = userStub.saveUser(mapToMsg(newUser));
-            return response.getSuccess();
-        } catch (StatusRuntimeException e) {
-            log.error("❌ Ошибка gRPC при сохранении пользователя: {}", e.getStatus());
-            return false;
-        }
-    }
 
     @Override
     public void deleteUser(Long userId) {
@@ -80,42 +65,6 @@ public class UsersServiceImpl implements UsersService, UserDetailsService {
             log.error("❌ Ошибка gRPC при получении списка пользователей: {}", e.getStatus());
             return List.of();
         }
-    }
-
-    @Override
-    public boolean isRolesDBEmpty() {
-        ActionResponse response = userStub.isRolesEmpty(UserEmpty.newBuilder().build());
-        return response.getSuccess();
-    }
-
-    @Override
-    public void prepareRolesDB() {
-        userStub.prepareRolesDB(UserEmpty.newBuilder().build());
-    }
-
-    @Override
-    public void prepareUserDB() {
-        userStub.prepareUserDB(UserEmpty.newBuilder().build());
-    }
-
-    // --- Интеграция со Spring Security ---
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        Users user = findUserByUserName(username);
-
-        if (user == null) {
-            throw new UsernameNotFoundException("User not found: " + username);
-        }
-
-        List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
-                .collect(Collectors.toList());
-
-        return new org.springframework.security.core.userdetails.User(
-                user.getUsername(),
-                user.getPassword(),
-                authorities
-        );
     }
 
     // --- Мапперы (Конвертация данных) ---
