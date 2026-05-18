@@ -13,11 +13,20 @@ graph TD
     Client[Браузер: Клиент<br>WebSocket STOMP / HTTP] --> Gateway[Gateway-microservice]
     Gateway -- Проверка JWT --> Users[USERS-microservice]
     Gateway -- Маршрутизация --> Engine[Raging-Horse-Tetris-4.2<br>Движок]
+    
+    %% Взаимодействие с USERS 
+    Engine -->|gRPC: UserService| Users
+    
+    %% Взаимодействие со Статистикой
     Engine <-->|gRPC / Feign| PG[PG-microservice<br>Статистика]
-    Engine -->|gRPC / Stream| Mongo[Mongo-microservice<br>Дампы игр / Скриншоты]
+    
+    %% Гибридное взаимодействие с MONGO 
+    Engine -->|gRPC: SnapshotService<br>Скриншоты, Магшоты, Дампы| Mongo[Mongo-microservice<br>Дампы игр / Скриншоты]
+    Engine -->|Feign / HTTP: MongoFeignClient<br>Очистка, Подготовка БД| Mongo
     
     style Engine fill:#2cf,stroke:#333,stroke-width:2px
     style Gateway fill:#f96,stroke:#333,stroke-width:1px
+
 ```
 
 1. **Identity & Access**: Пользователь начинает с `USERS-microservice`, где проходит регистрацию/аутентификацию и получает JWT-токен.
@@ -185,12 +194,6 @@ graph TD
 * **Матричные алгоритмы транспонирования**: Поворот фигур вокруг своей оси осуществляется методом `rotateMatrix` путем классического математического поворота двумерной матрицы на 90 градусов против часовой стрелки (`t[w - x - 1][y] = m[y][x]`), сохраняя исходные физические пропорции тетрамино.
 
 * **Динамический разгон игрового цикла**: Скорость падения фигур не является константной величиной. Метод `getStepDown` на каждом такте рассчитывает шаг смещения на основе прогресса игрока по формуле `(score / 10) + 1`. Это обеспечивает плавное и предсказуемое нарастание хардкорности игрового процесса по мере уничтожения линий.
-
----
-
-## 🧠 Топология Распределенного Кэширования (`hazelcast.yaml`)
-
-Для обеспечения отказоустойчивости и горизонтального масштабирования (Stateless-архитектура), движок использует распределенную In-Memory Data Grid (IMDG) на базе **Hazelcast**. Все состояния игровых сессий синхронизируются внутри кластера `raging-horse-tetris-cluster`.
 
 ---
 
