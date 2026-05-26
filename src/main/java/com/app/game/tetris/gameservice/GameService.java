@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface GameService {
-    CompletableFuture<String> getGameData(String playerName);
+    String getGameData(String playerName);
     List<Game> getAllGames();
     void deleteGameData(String playerName);
     void doRecord(Game game);

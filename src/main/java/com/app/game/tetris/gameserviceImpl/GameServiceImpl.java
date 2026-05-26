@@ -27,8 +27,8 @@ public class GameServiceImpl implements GameService {
     }
 
     @Override
-    public CompletableFuture<String> getGameData(String playerName) {
-        return CompletableFuture.supplyAsync(() -> {
+    public String getGameData(String playerName) {
+
             try {
                 log.info("🛰️ Запрос gRPC статистики для игрока: {}", playerName);
 
@@ -50,7 +50,7 @@ public class GameServiceImpl implements GameService {
                 // Возвращаем пустой объект, чтобы JSONObject не упал при парсинге
                 return "{}";
             }
-        });
+
     }
 
     @Override

@@ -67,43 +67,70 @@ public class TetrisController {
     @MessageMapping("/hello")
     public void hello(Principal principal) {
         if (principal == null) return;
+
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
-        String username = (destinationId.contains(":")) ? destinationId.split(":")[1] : "Player_" + userId;
+        String username = destinationId.contains(":") ? destinationId.split(":")[1] : "Player_" + userId;
+
         try {
-            // 1. Инициализация (синхронно, так как это база для состояния)
+            // 1. Инициализация (синхронно)
             var gameState = playGameService.initiateState(username, userId);
             playGameService.setState(gameState, userId);
 
-            // 2. Метод помечен @Async в сервисе, поэтому он сам уйдет в виртуальный поток.
-            // Нам не нужно писать Thread.startVirtualThread здесь.
+            // 2. Уходит в @Async
             mongoService.prepareMongoDBForNewPLayer(username);
 
-            // 3. Сразу отправляем игроку игровое поле
+            // 3. Отправка поля
             displayService.sendGameToBeDisplayed(gameState.getGame(), template, destinationId);
 
-            // 4. Асинхронно запрашиваем статистику.
-            // Основной поток метода завершится, а когда придет ответ — отправим рекорды.
-            gameService.getGameData(username).thenAccept(rawData -> {
-                if (rawData != null && !rawData.isEmpty()) {
-                    try {
+            // 4. ОПТИМИЗАЦИЯ: Просто запускаем ОДИН виртуальный поток для фоновой тяжелой логики
+            Thread.startVirtualThread(() -> {
+                try {
+                    // Шаг 1: Получаем данные gRPC (Линейно! Loom сам сработает асинхронно на IO)
+                    String rawData = gameService.getGameData(username);
+                    log.info("📡 КРИТИЧЕСКИЙ ДЕБАГ: Что прислал gRPC микросервис? -> {}", rawData);
+
+                    String bestPlayer = "None";
+                    int bestScore = 0;
+
+                    if (rawData != null && !rawData.isEmpty() && !rawData.equals("{}")) {
                         JSONObject jsonGameData = new JSONObject(rawData);
-                        GameDataDTO gameDataRecord = new GameDataDTO(
-                                jsonGameData.optString("bestplayer", "None"),
-                                jsonGameData.optInt("bestscore", 0)
-                        );
-                        displayService.sendDaoGameToBeDisplayed(gameDataRecord, template, destinationId);
-                        log.info("📊 Рекорды для {} успешно отправлены", username);
-                    } catch (Exception e) {
-                        log.error("💥 Ошибка парсинга JSON для {}: {}", username, e.getMessage());
+                        bestPlayer = jsonGameData.optString("bestplayer", "None");
+                        bestScore = jsonGameData.optInt("bestscore", 0);
                     }
+                    log.info("🎯 КРИТИЧЕСКИЙ ДЕБАГ: Какое имя мы распарсили как лидера? -> {}", bestPlayer);
+
+                    // Шаг 2: Получаем аватарку из MongoDB (Тоже линейно, никаких колбэков)
+                    byte[] imageBytes = null;
+                    if (!"None".equals(bestPlayer)) {
+                        try {
+                            imageBytes = mongoService.loadByteArrayFromMongodb(bestPlayer, "mugShot");
+                        } catch (Exception e) {
+                            log.error("❌ Ошибка загрузки аватарки лидера {} из MongoDB: {}", bestPlayer, e.getMessage());
+                        }
+                    }
+
+                    // Шаг 3: Сборка DTO и отправка
+                    String avatarBase64 = "";
+                    if (imageBytes != null && imageBytes.length > 0) {
+                        avatarBase64 = java.util.Base64.getEncoder().encodeToString(imageBytes);
+                    }
+
+                    PlayerWelcomeDTO welcomeData = new PlayerWelcomeDTO(bestPlayer, bestScore, avatarBase64);
+                    template.convertAndSendToUser(destinationId, "/queue/welcomeData", welcomeData);
+                    log.info("🏆 Аватарка ЧЕМПИОНА {} успешно отправлена в /queue/welcomeData", bestPlayer);
+
+                } catch (Exception e) {
+                    log.error("💥 Ошибка обработки данных лидера в виртуальном потоке: {}", e.getMessage());
                 }
             });
+
             log.info("🚀 Основная инициализация завершена для: {}", username);
         } catch (Exception e) {
             log.error("💥 Ошибка в hello: {}", e.getMessage());
         }
     }
+
 
     @MessageMapping("/profile")
     public void profile(Principal principal) {
@@ -119,28 +146,33 @@ public class TetrisController {
             return;
         }
         String playerName = state.getGame().getPlayerName();
-        // 1. Асинхронный вызов микросервиса через CompletableFuture
-        gameService.getGameData(playerName).thenAccept(rawData -> {
-            if (rawData != null && !rawData.isEmpty()) {
-                try {
+
+        // Запускаем обработку в легком виртуальном потоке
+        Thread.startVirtualThread(() -> {
+            try {
+                // Чистый синхронный вызов gRPC-сервиса
+                String rawData = gameService.getGameData(playerName);
+
+                if (rawData != null && !rawData.isEmpty() && !rawData.equals("{}")) {
                     JSONObject jsonGameData = new JSONObject(rawData);
 
-                    // 2. Отправляем профиль (имя и лучший счет)
+                    // Отправляем профиль (имя и лучший счет)
                     this.template.convertAndSendToUser(destinationId, "/queue/playerStat",
                             new PlayerProfileDTO(
                                     playerName,
                                     jsonGameData.optInt("playerbestscore", 0)
                             ));
-                    // 3. Отправляем попытки (только число)
+
+                    // Отправляем попытки (только число)
                     this.template.convertAndSendToUser(destinationId, "/queue/playerAttemptsNumber",
                             new PlayerAttemptsDTO(
                                     jsonGameData.optInt("playerAttemptsNumber", 0)
                             ));
 
-                    log.info("👤 Профиль игрока {} отправлен", playerName);
-                } catch (Exception e) {
-                    log.error("💥 Ошибка обработки профиля для {}: {}", playerName, e.getMessage());
+                    log.info("👤 Профиль игрока {} отправлен из виртуального потока", playerName);
                 }
+            } catch (Exception e) {
+                log.error("💥 Ошибка обработки профиля для {}: {}", playerName, e.getMessage());
             }
         });
     }
@@ -272,20 +304,33 @@ public class TetrisController {
 
     @MessageMapping("/{moveId}")
     public void gamePlayDown(@DestinationVariable String moveId, Principal principal) {
+        if (principal == null) return;
+
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
         var currentState = playGameService.getState(userId);
+
+        // Защита: если стейта нет и это не старт — выходим
         if (currentState == null && !moveId.equals("start")) {
             return;
         }
+
         switch (moveId) {
             case "start" -> {
+                // Защита от NullPointerException, если стейт по какой-то причине еще не создался в /hello
+                if (currentState == null) {
+                    log.warn("⚠️ Попытка старта игры без инициализированного стейта для ID: {}", userId);
+                    return;
+                }
+
                 String playerName = currentState.getGame().getPlayerName();
-                // 1. Асинхронно запрашиваем рекорды.
-                // Это не мешает немедленному запуску таймера ниже.
-                gameService.getGameData(playerName).thenAccept(rawData -> {
-                    if (rawData != null && !rawData.isEmpty()) {
-                        try {
+
+                // 1. Асинхронно запрашиваем рекорды в виртуальном потоке.
+                // gRPC-вызов не затормозит запуск таймера.
+                Thread.startVirtualThread(() -> {
+                    try {
+                        String rawData = gameService.getGameData(playerName);
+                        if (rawData != null && !rawData.isEmpty() && !rawData.equals("{}")) {
                             JSONObject jsonGameData = new JSONObject(rawData);
                             displayService.sendDaoGameToBeDisplayed(
                                     new GameDataDTO(
@@ -295,13 +340,13 @@ public class TetrisController {
                                     template,
                                     destinationId
                             );
-                        } catch (Exception e) {
-                            log.error("❌ Error parsing game data for {}: {}", playerName, e.getMessage());
                         }
+                    } catch (Exception e) {
+                        log.error("❌ Error parsing game data for {}: {}", playerName, e.getMessage());
                     }
                 });
-                // 2. Запуск таймера падения (ScheduledTask в Spring Boot 3.4
-                // при включенных виртуальных потоках тоже работает эффективно)
+
+                // 2. Запуск таймера падения фигур (каждую секунду)
                 ScheduledFuture<?> task = taskScheduler.scheduleAtFixedRate(
                         () -> displayService.sendStateToBeDisplayed(
                                 playGameService,
@@ -319,11 +364,13 @@ public class TetrisController {
             case "3" -> playGameService.setState(playGameService.moveRightState(currentState, userId), userId);
             case "4" -> playGameService.setState(playGameService.dropDownState(currentState, userId), userId);
         }
+
         // Отправляем визуал (кроме start, так как там работает планировщик)
         if (!moveId.equals("start")) {
             displayService.sendStateToBeDisplayed(playGameService, gameService, template, destinationId);
         }
     }
+
 
     @MessageMapping("/save")
     public void gameSave(Principal principal) {
@@ -368,33 +415,44 @@ public class TetrisController {
     @MessageMapping("/snapShot")
     public void makeSnapShot(Principal principal) {
         if (principal == null) return;
+
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
         var currentState = playGameService.getState(userId);
         if (currentState == null) return;
+
         String playerName = currentState.getGame().getPlayerName();
-        // 1. Запрашиваем данные асинхронно
-        gameService.getGameData(playerName).thenAccept(rawData -> {
-            if (rawData == null || rawData.isEmpty()) return;
+
+        // Переносим всю тяжелую логику (gRPC -> Скриншот -> MongoDB) в отдельный виртуальный поток
+        Thread.startVirtualThread(() -> {
             try {
+                // 1. Синхронный запрос данных через gRPC
+                String rawData = gameService.getGameData(playerName);
+                if (rawData == null || rawData.isEmpty() || rawData.equals("{}")) return;
+
                 JSONObject jsonGameData = new JSONObject(rawData);
                 String bestPlayer = jsonGameData.optString("bestplayer", "None");
                 int bestScore = jsonGameData.optInt("bestscore", 0);
                 int playerBestScore = jsonGameData.optInt("playerbestscore", 0);
-                // 2. Делаем обычный скриншот (в виртуальном потоке это дешево)
+
+                // 2. Делаем обычный скриншот (в виртуальном потоке блокировка I/O абсолютно бесплатна)
                 gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", playGameService, currentState, bestPlayer, bestScore);
-                // Эти методы помечены @Async, они сами запустят свои виртуальные потоки
+
+                // Эти методы помечены @Async, они отработают параллельно в своих виртуальных потоках
                 mongoService.cleanImageMongodb(playerName, "deskTopSnapShot");
                 mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShot");
+
                 // 3. Если побит личный рекорд — делаем "Best" скриншот
                 if (currentState.getGame().getPlayerScore() >= playerBestScore) {
                     gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", playGameService, currentState, bestPlayer, bestScore);
                     mongoService.cleanImageMongodb(playerName, "deskTopSnapShotBest");
                     mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShotBest");
                 }
-                // 4. Отправляем финальный экран (теперь это не блокирует основной поток)
+
+                // 4. Отправляем финальный экран пользователю
                 displayService.sendFinalStateToBeDisplayed(playGameService, template, destinationId);
-                log.info("📸 Скриншоты для {} успешно обработаны", playerName);
+                log.info("📸 Скриншоты для {} успешно обработаны в виртуальном потоке", playerName);
+
             } catch (Exception e) {
                 log.error("💥 Ошибка при создании скриншотов для {}: {}", playerName, e.getMessage());
             }
