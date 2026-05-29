@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -27,6 +28,9 @@ import java.security.Principal;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
@@ -42,6 +46,7 @@ public class TetrisController {
     private final GameService gameService;
     private final MongoService mongoService;
     private final DisplayService displayService;
+    private final Executor loomExecutor; // Наш глобальный двигатель
 
     // В Spring 4.3+ аннотация @Autowired над конструктором не обязательна, если он один
     public TetrisController(
@@ -52,7 +57,8 @@ public class TetrisController {
             GameArtefactService gameArtefactService,
             GameService gameService,
             MongoService mongoService,
-            DisplayService displayService
+            DisplayService displayService,
+            @Qualifier("loomExecutor") Executor loomExecutor //чтобы Spring четко понимал, какой именно экзекутор
     ) {
         this.taskScheduler = taskScheduler;
         this.playGameService = playGameService;
@@ -62,6 +68,7 @@ public class TetrisController {
         this.gameService = gameService;
         this.mongoService = mongoService;
         this.displayService = displayService;
+        this.loomExecutor = loomExecutor;
     }
 
     @MessageMapping("/hello")
@@ -83,34 +90,28 @@ public class TetrisController {
             // 3. Отправка поля
             displayService.sendGameToBeDisplayed(gameState.getGame(), template, destinationId);
 
-            // 4. ОПТИМИЗАЦИЯ: Просто запускаем ОДИН виртуальный поток для фоновой тяжелой логики
-            Thread.startVirtualThread(() -> {
+            // 3. САМЫЙ СВЕЖИЙ КАНОН: Запускаем цепочку в виртуальном потоке через CompletableFuture
+            CompletableFuture.runAsync(() -> {
+                // Линейный код без колбэков
                 try {
-                    // Шаг 1: Получаем данные gRPC (Линейно! Loom сам сработает асинхронно на IO)
+                    // Шаг 1: gRPC (Линейно)
                     String rawData = gameService.getGameData(username);
-                    log.info("📡 КРИТИЧЕСКИЙ ДЕБАГ: Что прислал gRPC микросервис? -> {}", rawData);
 
                     String bestPlayer = "None";
                     int bestScore = 0;
-
                     if (rawData != null && !rawData.isEmpty() && !rawData.equals("{}")) {
                         JSONObject jsonGameData = new JSONObject(rawData);
                         bestPlayer = jsonGameData.optString("bestplayer", "None");
                         bestScore = jsonGameData.optInt("bestscore", 0);
                     }
-                    log.info("🎯 КРИТИЧЕСКИЙ ДЕБАГ: Какое имя мы распарсили как лидера? -> {}", bestPlayer);
 
-                    // Шаг 2: Получаем аватарку из MongoDB (Тоже линейно, никаких колбэков)
+                    // Шаг 2: MongoDB
                     byte[] imageBytes = null;
                     if (!"None".equals(bestPlayer)) {
-                        try {
-                            imageBytes = mongoService.loadByteArrayFromMongodb(bestPlayer, "mugShot");
-                        } catch (Exception e) {
-                            log.error("❌ Ошибка загрузки аватарки лидера {} из MongoDB: {}", bestPlayer, e.getMessage());
-                        }
+                        imageBytes = mongoService.loadByteArrayFromMongodb(bestPlayer, "mugShot");
                     }
 
-                    // Шаг 3: Сборка DTO и отправка
+                    // Шаг 3: WebSocket
                     String avatarBase64 = "";
                     if (imageBytes != null && imageBytes.length > 0) {
                         avatarBase64 = java.util.Base64.getEncoder().encodeToString(imageBytes);
@@ -118,19 +119,22 @@ public class TetrisController {
 
                     PlayerWelcomeDTO welcomeData = new PlayerWelcomeDTO(bestPlayer, bestScore, avatarBase64);
                     template.convertAndSendToUser(destinationId, "/queue/welcomeData", welcomeData);
-                    log.info("🏆 Аватарка ЧЕМПИОНА {} успешно отправлена в /queue/welcomeData", bestPlayer);
 
                 } catch (Exception e) {
-                    log.error("💥 Ошибка обработки данных лидера в виртуальном потоке: {}", e.getMessage());
+                    log.error("💥 Ошибка в фоновом Loom-потоке: {}", e.getMessage());
                 }
-            });
+                //Создатели Java 8 заложили в этот метод потрясающую гибкость:
+                // они разрешили передавать туда свой собственный движок (Executor) вторым параметром
+            }, loomExecutor); // Напрямую указываем Loom-движок Java 21!
+            //мы взяли старый, проверенный и мощный инструмент управления асинхронностью
+            // из Java 8 (CompletableFuture) и просто поменяли ему внутренний сгораемый мотор
+            // на космический электродвигатель из Java 21 (Virtual Threads)
 
             log.info("🚀 Основная инициализация завершена для: {}", username);
         } catch (Exception e) {
             log.error("💥 Ошибка в hello: {}", e.getMessage());
         }
     }
-
 
     @MessageMapping("/profile")
     public void profile(Principal principal) {
@@ -187,31 +191,45 @@ public class TetrisController {
         // 2. Достаем имя игрока из состояния игры (State)
         String playerName = playGameService.getState(userId).getGame().getPlayerName();
 
-        // 3. Очищаем старое фото и грузим новое в Mongo по имени игрока
-        mongoService.cleanImageMongodb(playerName, "");
+        // Переносим тяжелую запись в Mongo на виртуальный поток
+        loomExecutor.execute(() -> {
+            try {
+                // Очищаем старое фото и грузим новое
+                mongoService.cleanImageMongodb(playerName, "");
 
-        // Декодируем и сохраняем
-        byte[] imageBytes = Base64.getDecoder().decode(imageBase64Stringsep);
-        mongoService.loadMugShotIntoMongodb(playerName, imageBytes);
+                byte[] imageBytes = Base64.getDecoder().decode(imageBase64Stringsep);
+                mongoService.loadMugShotIntoMongodb(playerName, imageBytes);
+
+                log.info("📸 Аватар для игрока {} успешно обновлен в MongoDB", playerName);
+            } catch (Exception e) {
+                log.error("💥 Ошибка при загрузке аватара для {}: {}", playerName, e.getMessage());
+            }
+        });
     }
 
     @GetMapping("/getPhoto")
     public void getPhoto(@RequestHeader("X-User-Id") String userId, HttpServletResponse response) {
-        String playerName = playGameService.getState(userId).getGame().getPlayerName();
+        String playerName = getPlayerNameOrRespond404(userId, response);
+        if (playerName == null) return; // Сервер уже ответил 404, останавливаем выполнение
+
         byte[] image = mongoService.loadByteArrayFromMongodb(playerName, "mugShot");
         writeImageToResponse(response, image);
     }
 
     @GetMapping("/getSnapShot")
     public void getSnapShot(@RequestHeader("X-User-Id") String userId, HttpServletResponse response) {
-        String playerName = playGameService.getState(userId).getGame().getPlayerName();
+        String playerName = getPlayerNameOrRespond404(userId, response);
+        if (playerName == null) return;
+
         byte[] image = mongoService.loadByteArrayFromMongodb(playerName, "deskTopSnapShot");
         writeImageToResponse(response, image);
     }
 
     @GetMapping("/getSnapShotBest")
     public void getSnapShotBest(@RequestHeader("X-User-Id") String userId, HttpServletResponse response) {
-        String playerName = playGameService.getState(userId).getGame().getPlayerName();
+        String playerName = getPlayerNameOrRespond404(userId, response);
+        if (playerName == null) return;
+
         byte[] image = mongoService.loadByteArrayFromMongodb(playerName, "deskTopSnapShotBest");
         writeImageToResponse(response, image);
     }
@@ -229,6 +247,18 @@ public class TetrisController {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    // Единственный приватный метод проверки для всего REST-контроллера
+    private String getPlayerNameOrRespond404(String userId, HttpServletResponse response) {
+        var state = playGameService.getState(userId);
+        // Если стейт неожиданно пропал (перезапуск сервера / таймаут сессии)
+        if (state == null) {
+            log.warn("⚠️ Сессионный In-Memory стейт для ID {} не найден. Возвращаем HTTP 404.", userId);
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND); // Красивый статус 404 для фронтенда
+            return null;
+        }
+        return state.getGame().getPlayerName();
     }
 
     @MessageMapping("/admin")
