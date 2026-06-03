@@ -8,9 +8,7 @@ import com.google.protobuf.ByteString;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,14 +18,12 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-@Slf4j // Добавим для красоты логирования
+@Slf4j
 public class MongoServiceImpl implements MongoService {
 
     private final String shotsPath;
     private final MongoFeignClient mongoFeignClient;
 
-    // Внедряем gRPC заглушку (Stub)
-    // "mongo-service" — это имя из properties выше
     @GrpcClient("mongo-service")
     private SnapshotServiceGrpc.SnapshotServiceBlockingStub snapshotStub;
 
@@ -36,30 +32,25 @@ public class MongoServiceImpl implements MongoService {
         this.mongoFeignClient = mongoFeignClient;
     }
 
-    @Async
+    // ТЕПЕРЬ СИНХРОННО: этот метод будет вызван внутри виртуального потока контроллера
     @Override
     public void loadSnapShotIntoMongodb(String playerName, String fileName) {
         String pathToShots = System.getProperty("user.dir") + shotsPath;
         try {
-            // 1. Читаем файл в массив байтов
             byte[] data = Files.readAllBytes(Path.of(pathToShots + fileName + ".jpg"));
 
-            // 2. Формируем gRPC запрос (наш Гагарин)
             SnapshotRequest request = SnapshotRequest.newBuilder()
                     .setPlayerName(playerName)
                     .setFileName(fileName)
-                    .setData(ByteString.copyFrom(data)) // Бинарная передача!
+                    .setData(ByteString.copyFrom(data))
                     .build();
 
             log.info("🛰 Отправка скриншота {} через gRPC для игрока {}", fileName, playerName);
-
-            // 3. Выполняем вызов
             SnapshotResponse response = snapshotStub.uploadSnapShot(request);
 
             if (response.getSuccess()) {
                 log.info("✅ gRPC ответ: {}", response.getMessage());
             }
-
         } catch (IOException e) {
             log.error("❌ Ошибка чтения файла: {}", e.getMessage());
         } catch (Exception e) {
@@ -67,35 +58,29 @@ public class MongoServiceImpl implements MongoService {
         }
     }
 
-    // Этот метод теперь выполнится в отдельном виртуальном потоке
-    @Async
+    // БЕЗ @Async: Контроллер сам упакует этот вызов в виртуальный поток
     @Override
     public void prepareMongoDBForNewPLayer(String playerName) {
-        log.info("🪄 Асинхронная подготовка БД для игрока: {}", playerName);
+        log.info("🪄 Подготовка БД для игрока: {}", playerName);
         mongoFeignClient.prepareMongoDBForNewPLayer(playerName);
     }
 
-    @Async
+    // БЕЗ @Async
     @Override
     public void cleanSavedGameMongodb(String playerName) {
         mongoFeignClient.cleanSavedGameMongodb(playerName);
     }
 
-    // Остальные методы (saveGame, gameRestart и т.д.) лучше оставить синхронными,
-    // так как обычно нам нужен их результат для продолжения логики,
-    // ЛИБО они вызываются внутри уже запущенного виртуального потока в контроллере.
-
     @Override
     public void saveGame(SavedGame savedGame) {
-        // Конвертируем char[][] в список строк для gRPC
         List<String> rows = Arrays.stream(savedGame.getCells())
-                .map(String::new) // Каждую строку чаров в String
+                .map(String::new)
                 .toList();
 
         SaveGameRequest request = SaveGameRequest.newBuilder()
                 .setPlayerName(savedGame.getPlayerName())
                 .setPlayerScore(savedGame.getPlayerScore())
-                .addAllRows(rows) // Добавляем всё поле
+                .addAllRows(rows)
                 .build();
 
         try {
@@ -118,25 +103,17 @@ public class MongoServiceImpl implements MongoService {
             GetSavedGameResponse response = snapshotStub.getSavedGame(request);
 
             if (response.getFound()) {
-                // Превращаем список строк gRPC обратно в char[][]
                 char[][] cells = response.getRowsList().stream()
                         .map(String::toCharArray)
                         .toArray(char[][]::new);
 
-                SavedGame savedGame = new SavedGame(
-                        response.getPlayerName(),
-                        response.getPlayerScore(),
-                        cells
-                );
-                return Optional.of(savedGame);
+                return Optional.of(new SavedGame(response.getPlayerName(), response.getPlayerScore(), cells));
             }
         } catch (Exception e) {
             log.error("❌ Ошибка gRPC при загрузке игры: {}", e.getMessage());
         }
-
         return Optional.empty();
     }
-
 
     @Override
     public void cleanImageMongodb(String playerName, String fileName) {

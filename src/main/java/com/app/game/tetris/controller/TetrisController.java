@@ -15,6 +15,8 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -46,7 +48,10 @@ public class TetrisController {
     private final GameService gameService;
     private final MongoService mongoService;
     private final DisplayService displayService;
-    private final Executor loomExecutor; // Наш глобальный двигатель
+
+    // Внедряем стандартный исполнитель задач Spring.
+    // Так как в properties включен виртуальный режим, под капотом будут Virtual Threads.
+    private final Executor applicationTaskExecutor;
 
     // В Spring 4.3+ аннотация @Autowired над конструктором не обязательна, если он один
     public TetrisController(
@@ -58,8 +63,8 @@ public class TetrisController {
             GameService gameService,
             MongoService mongoService,
             DisplayService displayService,
-            @Qualifier("loomExecutor") Executor loomExecutor //чтобы Spring четко понимал, какой именно экзекутор
-    ) {
+            @Qualifier("applicationTaskExecutor") Executor  applicationTaskExecutor
+            ) {
         this.taskScheduler = taskScheduler;
         this.playGameService = playGameService;
         this.template = template;
@@ -68,33 +73,32 @@ public class TetrisController {
         this.gameService = gameService;
         this.mongoService = mongoService;
         this.displayService = displayService;
-        this.loomExecutor = loomExecutor;
+        this.applicationTaskExecutor = applicationTaskExecutor;
     }
 
     @MessageMapping("/hello")
     public void hello(Principal principal) {
         if (principal == null) return;
 
+        // Безопасный парсинг без риска получить ArrayIndexOutOfBoundsException
         String destinationId = principal.getName();
-        String userId = destinationId.split(":")[0];
-        String username = destinationId.contains(":") ? destinationId.split(":")[1] : "Player_" + userId;
+        String[] parts = destinationId.split(":");
+        String userId = parts[0];
+        String username = parts.length > 1 ? parts[1] : "Player_" + userId;
 
         try {
-            // 1. Инициализация (синхронно)
+            // 1. СИНХРОННАЯ ИНИЦИАЛИЗАЦИЯ (Быстрая логика в памяти)
             var gameState = playGameService.initiateState(username, userId);
             playGameService.setState(gameState, userId);
-
-            // 2. Уходит в @Async
-            mongoService.prepareMongoDBForNewPLayer(username);
-
-            // 3. Отправка поля
             displayService.sendGameToBeDisplayed(gameState.getGame(), template, destinationId);
 
-            // 3. САМЫЙ СВЕЖИЙ КАНОН: Запускаем цепочку в виртуальном потоке через CompletableFuture
+            // 2. АСИНХРОННЫЙ БЛОК (Все тяжелые I/O операции уходят в Виртуальный Поток)
             CompletableFuture.runAsync(() -> {
-                // Линейный код без колбэков
                 try {
-                    // Шаг 1: gRPC (Линейно)
+                    // Шаг А: Подготовка БД (теперь выполняется явно здесь, линейно)
+                    mongoService.prepareMongoDBForNewPLayer(username);
+
+                    // Шаг Б: Запрос gRPC данных игры
                     String rawData = gameService.getGameData(username);
 
                     String bestPlayer = "None";
@@ -105,34 +109,30 @@ public class TetrisController {
                         bestScore = jsonGameData.optInt("bestscore", 0);
                     }
 
-                    // Шаг 2: MongoDB
-                    byte[] imageBytes = null;
-                    if (!"None".equals(bestPlayer)) {
-                        imageBytes = mongoService.loadByteArrayFromMongodb(bestPlayer, "mugShot");
-                    }
-
-                    // Шаг 3: WebSocket
+                    // Шаг В: Загрузка тяжелого магшота из MongoDB
                     String avatarBase64 = "";
-                    if (imageBytes != null && imageBytes.length > 0) {
-                        avatarBase64 = java.util.Base64.getEncoder().encodeToString(imageBytes);
+                    if (!"None".equals(bestPlayer)) {
+                        byte[] imageBytes = mongoService.loadByteArrayFromMongodb(bestPlayer, "mugShot");
+                        if (imageBytes != null && imageBytes.length > 0) {
+                            avatarBase64 = java.util.Base64.getEncoder().encodeToString(imageBytes);
+                        }
                     }
 
+                    // Шаг Г: Отправка приветствия клиенту через WebSocket
                     PlayerWelcomeDTO welcomeData = new PlayerWelcomeDTO(bestPlayer, bestScore, avatarBase64);
                     template.convertAndSendToUser(destinationId, "/queue/welcomeData", welcomeData);
 
-                } catch (Exception e) {
-                    log.error("💥 Ошибка в фоновом Loom-потоке: {}", e.getMessage());
-                }
-                //Создатели Java 8 заложили в этот метод потрясающую гибкость:
-                // они разрешили передавать туда свой собственный движок (Executor) вторым параметром
-            }, loomExecutor); // Напрямую указываем Loom-движок Java 21!
-            //мы взяли старый, проверенный и мощный инструмент управления асинхронностью
-            // из Java 8 (CompletableFuture) и просто поменяли ему внутренний сгораемый мотор
-            // на космический электродвигатель из Java 21 (Virtual Threads)
+                    log.info("🎯 Фоновая обработка для игрока {} успешно завершена", username);
 
-            log.info("🚀 Основная инициализация завершена для: {}", username);
+                } catch (Exception e) {
+                    log.error("💥 Ошибка в фоновом виртуальном потоке для {}: {}", username, e.getMessage(), e);
+                }
+            }, applicationTaskExecutor); // Передаем управляемый Spring-ом движок виртуальных потоков
+
+            log.info("🚀 Основной поток контроллера освобожден для: {}", username);
+
         } catch (Exception e) {
-            log.error("💥 Ошибка в hello: {}", e.getMessage());
+            log.error("💥 Критическая ошибка инициализации в методе hello: {}", e.getMessage());
         }
     }
 
@@ -143,7 +143,6 @@ public class TetrisController {
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
 
-        // Получаем стейт из мапы (память)
         var state = playGameService.getState(userId);
         if (state == null) {
             log.warn("⚠️ Попытка доступа к профилю без активного стейта для ID: {}", userId);
@@ -151,61 +150,70 @@ public class TetrisController {
         }
         String playerName = state.getGame().getPlayerName();
 
-        // Запускаем обработку в легком виртуальном потоке
-        Thread.startVirtualThread(() -> {
+        // Каноничный запуск цепочки в виртуальном потоке
+        CompletableFuture.runAsync(() -> {
             try {
-                // Чистый синхронный вызов gRPC-сервиса
                 String rawData = gameService.getGameData(playerName);
 
                 if (rawData != null && !rawData.isEmpty() && !rawData.equals("{}")) {
                     JSONObject jsonGameData = new JSONObject(rawData);
 
-                    // Отправляем профиль (имя и лучший счет)
                     this.template.convertAndSendToUser(destinationId, "/queue/playerStat",
-                            new PlayerProfileDTO(
-                                    playerName,
-                                    jsonGameData.optInt("playerbestscore", 0)
-                            ));
+                            new PlayerProfileDTO(playerName, jsonGameData.optInt("playerbestscore", 0)));
 
-                    // Отправляем попытки (только число)
                     this.template.convertAndSendToUser(destinationId, "/queue/playerAttemptsNumber",
-                            new PlayerAttemptsDTO(
-                                    jsonGameData.optInt("playerAttemptsNumber", 0)
-                            ));
+                            new PlayerAttemptsDTO(jsonGameData.optInt("playerAttemptsNumber", 0)));
 
-                    log.info("👤 Профиль игрока {} отправлен из виртуального потока", playerName);
+                    log.info("👤 Профиль игрока {} отправлен из виртуального потока loomExecutor", playerName);
                 }
             } catch (Exception e) {
                 log.error("💥 Ошибка обработки профиля для {}: {}", playerName, e.getMessage());
             }
-        });
+        }, applicationTaskExecutor); // Передаем ваш единый Loom-движок
     }
 
     @MessageMapping("/upload")
     public void upload(String imageBase64Stringsep, Principal principal) {
+        if (principal == null) return;
+
+        // 1. Безопасный парсинг ID
         String destinationId = principal.getName();
-        // 2. Распаковываем данные для логики сервисов
-        String[] parts = destinationId.split(":");
-        String userId = parts[0];
+        String userId = destinationId.split(":")[0];
 
-        // 2. Достаем имя игрока из состояния игры (State)
-        String playerName = playGameService.getState(userId).getGame().getPlayerName();
+        try {
+            // 2. Декодируем CPU-интенсивную задачу СРАЗУ в потоке брокера.
+            // Это безопасно, так как операция занимает микросекунды и не забивает Loom.
+            byte[] imageBytes = Base64.getDecoder().decode(imageBase64Stringsep);
 
-        // Переносим тяжелую запись в Mongo на виртуальный поток
-        loomExecutor.execute(() -> {
-            try {
-                // Очищаем старое фото и грузим новое
-                mongoService.cleanImageMongodb(playerName, "");
+            // 3. Уходим в виртуальный поток Spring только для сетевых I/O операций
+            applicationTaskExecutor.execute(() -> {
+                try {
+                    var state = playGameService.getState(userId);
+                    if (state == null || state.getGame() == null) {
+                        log.warn("⚠️ Не удалось загрузить аватар: активная игра для ID {} не найдена", userId);
+                        return;
+                    }
+                    String playerName = state.getGame().getPlayerName();
 
-                byte[] imageBytes = Base64.getDecoder().decode(imageBase64Stringsep);
-                mongoService.loadMugShotIntoMongodb(playerName, imageBytes);
+                    // Очищаем старое фото (Feign HTTP call — идеальный блокирующий I/O для Loom)
+                    mongoService.cleanImageMongodb(playerName, "");
 
-                log.info("📸 Аватар для игрока {} успешно обновлен в MongoDB", playerName);
-            } catch (Exception e) {
-                log.error("💥 Ошибка при загрузке аватара для {}: {}", playerName, e.getMessage());
-            }
-        });
+                    // Грузим новое фото (gRPC call — идеальный блокирующий I/O для Loom)
+                    mongoService.loadMugShotIntoMongodb(playerName, imageBytes);
+
+                    log.info("📸 Аватар для игрока {} успешно обновлен в MongoDB", playerName);
+                } catch (Exception e) {
+                    log.error("💥 Ошибка при обработке аватара в виртуальном потоке: {}", e.getMessage(), e);
+                }
+            });
+
+        } catch (IllegalArgumentException e) {
+            log.error("❌ Ошибка: присланная строка не является валидным Base64: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("💥 Критическая ошибка в методе upload: {}", e.getMessage());
+        }
     }
+
 
     @GetMapping("/getPhoto")
     public void getPhoto(@RequestHeader("X-User-Id") String userId, HttpServletResponse response) {
@@ -263,28 +271,35 @@ public class TetrisController {
 
     @MessageMapping("/admin")
     public void admin(Principal principal) {
-        // 1. Получаем список всех пользователей через Feign/Service
-        List<Users> allUsersList = usersService.getAllUsers();
-        allUsersList.forEach(user -> {
-            // 2. Формируем строку ролей
-            String rolesString = user.getRoles().stream()
-                    .map(Roles::getName)
-                    .collect(Collectors.joining(";"));
-            // Проверяем, есть ли роль ADMIN (для флага в DTO)
-            boolean isAdmin = rolesString.contains("ADMIN");
-            // 3. Создаем рекорд и отправляем его
-            UserResponseDTO userDto = new UserResponseDTO(
-                    user.getId(),
-                    user.getUsername(),
-                    rolesString,
-                    isAdmin
-            );
-            this.template.convertAndSend("/topic/users", userDto);
-        });
-        gameService.getAllGames()
-                .forEach(game -> {
-                    System.out.println("ОТПРАВКА НА ФРОНТ: " + game.getPlayerName() + " - " + game.getPlayerScore());
-                    // Используем новое имя класса GameRecord
+        if (principal == null) return;
+
+        // 🚀 Мгновенно уходим в виртуальный поток Spring, освобождая брокер WebSocket
+        applicationTaskExecutor.execute(() -> {
+            try {
+                // 1. Получаем список всех пользователей через Feign/Service (блокирующий I/O в Луме)
+                List<Users> allUsersList = usersService.getAllUsers();
+                allUsersList.forEach(user -> {
+                    // 2. Формируем строку ролей
+                    String rolesString = user.getRoles().stream()
+                            .map(Roles::getName)
+                            .collect(Collectors.joining(";"));
+
+                    boolean isAdmin = rolesString.contains("ADMIN");
+
+                    // 3. Создаем DTO и отправляем его
+                    UserResponseDTO userDto = new UserResponseDTO(
+                            user.getId(),
+                            user.getUsername(),
+                            rolesString,
+                            isAdmin
+                    );
+                    this.template.convertAndSend("/topic/users", userDto);
+                });
+
+                // 4. Получаем список игр через gRPC (блокирующий I/O в Луме)
+                gameService.getAllGames().forEach(game -> {
+                    log.info("📊 ОТПРАВКА НА ФРОНТ: {} - {}", game.getPlayerName(), game.getPlayerScore());
+
                     GameRecord recordDto = new GameRecord(
                             game.getId(),
                             game.getPlayerName(),
@@ -292,6 +307,13 @@ public class TetrisController {
                     );
                     this.template.convertAndSend("/topic/results", recordDto);
                 });
+
+                log.info("🎯 Админ-панель успешно обновлена в виртуальном потоке для пользователя {}", principal.getName());
+
+            } catch (Exception e) {
+                log.error("💥 Ошибка при обработке данных админки в виртуальном потоке: {}", e.getMessage(), e);
+            }
+        });
     }
 
     @MessageMapping("/admin/{targetUserId}")
