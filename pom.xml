@@ -163,14 +163,22 @@
                 </executions>
             </plugin>
 
-
-
-
-
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- 🔥 Автоматически прокидываем права для Hazelcast при запуске через Maven / Spring Boot -->
+                    <jvmArguments>
+                        --add-modules java.se
+                        --add-exports java.base/jdk.internal.ref=ALL-UNNAMED
+                        --add-opens java.base/java.lang=ALL-UNNAMED
+                        --add-opens java.base/sun.nio.ch=ALL-UNNAMED
+                        --add-opens java.management/sun.management=ALL-UNNAMED
+                        --add-opens jdk.management/com.sun.management.internal=ALL-UNNAMED
+                    </jvmArguments>
+                </configuration>
             </plugin>
+
         </plugins>
     </build>
 </project>
