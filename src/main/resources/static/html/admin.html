@@ -144,29 +144,7 @@
         stompClient.activate();
     }
 
-    function showUsers(usersData) {
-        // Если данные приходят строкой (JSON), парсим.
-        // Если WebSocket уже отдал объект, parse не нужен.
-        const user = typeof usersData === 'string' ? JSON.parse(usersData) : usersData;
 
-        // Теперь используем чёткие имена полей из нашего Record DTO:
-        // user.id, user.username, user.roles
-        const displayRoles = user.roles || "USER";
-
-        $("#users tbody").append(`
-        <tr id="user-row-${user.id}">
-            <td>${user.id}</td>
-            <td>${user.username}</td>
-            <td>*</td> <!-- Пароль в DTO больше не передаем из соображений безопасности -->
-            <td>${displayRoles}</td>
-            <td>
-                <button class="btn-delete" onclick="deleteUser(${user.id})">
-                    DELETE
-                </button>
-            </td>
-        </tr>
-    `);
-    }
 
     function deleteUser(id) {
         if(!confirm("Are you sure you want to delete user " + id + "?")) return;
@@ -178,16 +156,63 @@
         setTimeout(() => { window.location.reload(); }, 500);
     }
 
-    function showResults(gameData) {
-        const res = typeof gameData === 'string' ? JSON.parse(gameData) : gameData;
+    function showUsers(usersData) {
+        // Парсим строку в полноценный JavaScript-массив
+        const usersList = typeof usersData === 'string' ? JSON.parse(usersData) : usersData;
 
-        $("#results tbody").append(`
-        <tr>
-            <td>${res.id}</td>
-            <td>${res.playerName}</td>
-            <td>${res.playerScore}</td>
-        </tr>
-    `);
+        // Очищаем тело таблицы, чтобы при повторных вызовах данные не дублировались
+        $("#users tbody").empty();
+
+        // Проверяем, что пришёл массив, и перебираем его в цикле
+        if (Array.isArray(usersList)) {
+            usersList.forEach(user => {
+                const displayRoles = user.roles || "USER";
+
+                $("#users tbody").append(`
+                <tr id="user-row-${user.id}">
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>*</td>
+                    <td>${displayRoles}</td>
+                    <td>
+                        <button class="btn-delete" onclick="deleteUser(${user.id})">
+                            DELETE
+                        </button>
+                    </td>
+                </tr>
+            `);
+            });
+        } else {
+            // На всякий случай оставляем старую одиночную логику как fallback
+            const user = usersList;
+            const displayRoles = user.roles || "USER";
+            $("#users tbody").append(`<tr id="user-row-${user.id}"><td>${user.id}</td><td>${user.username}</td><td>*</td><td>${displayRoles}</td><td><button class="btn-delete" onclick="deleteUser(${user.id})">DELETE</button></td></tr>`);
+        }
+    }
+
+    function showResults(gameData) {
+        // Парсим прилетевшую gRPC статистику в массив
+        const resultsList = typeof gameData === 'string' ? JSON.parse(gameData) : gameData;
+
+        // Очищаем таблицу результатов перед заполнением
+        $("#results tbody").empty();
+
+        // Проверяем на массив и рендерим строки в цикле
+        if (Array.isArray(resultsList)) {
+            resultsList.forEach(res => {
+                $("#results tbody").append(`
+                <tr>
+                    <td>${res.id}</td>
+                    <td>${res.playerName}</td>
+                    <td>${res.playerScore}</td>
+                </tr>
+            `);
+            });
+        } else {
+            // Фоллбэк для одиночного объекта
+            const res = resultsList;
+            $("#results tbody").append(`<tr><td>${res.id}</td><td>${res.playerName}</td><td>${res.playerScore}</td></tr>`);
+        }
     }
 
     $(function () {

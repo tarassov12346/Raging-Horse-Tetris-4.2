@@ -276,39 +276,48 @@ public class TetrisController {
         // 🚀 Мгновенно уходим в виртуальный поток Spring, освобождая брокер WebSocket
         applicationTaskExecutor.execute(() -> {
             try {
-                // 1. Получаем список всех пользователей через Feign/Service (блокирующий I/O в Луме)
+                // ==========================================
+                // 1. ПОДГОТОВКА И ПАКЕТНАЯ ОТПРАВКА ПОЛЬЗОВАТЕЛЕЙ
+                // ==========================================
                 List<Users> allUsersList = usersService.getAllUsers();
-                allUsersList.forEach(user -> {
-                    // 2. Формируем строку ролей
-                    String rolesString = user.getRoles().stream()
-                            .map(Roles::getName)
-                            .collect(Collectors.joining(";"));
 
-                    boolean isAdmin = rolesString.contains("ADMIN");
+                // Маппим весь список в памяти
+                List<UserResponseDTO> userDtos = allUsersList.stream()
+                        .map(user -> {
+                            String rolesString = user.getRoles().stream()
+                                    .map(Roles::getName)
+                                    .collect(Collectors.joining(";"));
 
-                    // 3. Создаем DTO и отправляем его
-                    UserResponseDTO userDto = new UserResponseDTO(
-                            user.getId(),
-                            user.getUsername(),
-                            rolesString,
-                            isAdmin
-                    );
-                    this.template.convertAndSend("/topic/users", userDto);
-                });
+                            // Безопасная проверка роли без contains() по подстроке
+                            boolean isAdmin = user.getRoles().stream()
+                                    .anyMatch(role -> "ADMIN".equals(role.getName()));
 
-                // 4. Получаем список игр через gRPC (блокирующий I/O в Луме)
-                gameService.getAllGames().forEach(game -> {
-                    log.info("📊 ОТПРАВКА НА ФРОНТ: {} - {}", game.getPlayerName(), game.getPlayerScore());
+                            return new UserResponseDTO(user.getId(), user.getUsername(), rolesString, isAdmin);
+                        })
+                        .collect(Collectors.toList());
 
-                    GameRecord recordDto = new GameRecord(
-                            game.getId(),
-                            game.getPlayerName(),
-                            game.getPlayerScore()
-                    );
-                    this.template.convertAndSend("/topic/results", recordDto);
-                });
+                // 🔥 ОТПРАВЛЯЕМ ВЕСЬ СПИСОК ОДНИМ ПАКЕТОМ (Фронтенд скажет спасибо)
+                if (!userDtos.isEmpty()) {
+                    this.template.convertAndSend("/topic/users", userDtos);
+                }
 
-                log.info("🎯 Админ-панель успешно обновлена в виртуальном потоке для пользователя {}", principal.getName());
+                // ==========================================
+                // 2. ПОДГОТОВКА И ПАКЕТНАЯ ОТПРАВКА РЕЗУЛЬТАТОВ (gRPC)
+                // ==========================================
+                var grpcGames = gameService.getAllGames();
+
+                List<GameRecord> recordDtos = grpcGames.stream()
+                        .map(game -> new GameRecord(game.getId(), game.getPlayerName(), game.getPlayerScore()))
+                        .collect(Collectors.toList());
+
+                // 🔥 ОТПРАВЛЯЕМ ВСЕ РЕЗУЛЬТАТЫ ОДНИМ ПАКЕТОМ
+                if (!recordDtos.isEmpty()) {
+                    this.template.convertAndSend("/topic/results", recordDtos);
+                }
+
+                // Один чистый лог на весь тяжелый процесс вместо сотен логов в цикле
+                log.info("🎯 Админ-панель успешно обновлена. Отправлено {} пользователей и {} игровых записей для {}",
+                        userDtos.size(), recordDtos.size(), principal.getName());
 
             } catch (Exception e) {
                 log.error("💥 Ошибка при обработке данных админки в виртуальном потоке: {}", e.getMessage(), e);
@@ -318,40 +327,63 @@ public class TetrisController {
 
     @MessageMapping("/admin/{targetUserId}")
     public void deleteUser(@DestinationVariable Long targetUserId, Principal principal) {
-        // 1. ПОЛУЧАЕМ ID МГНОВЕННО (из токена, проброшенного интерцептором)
-        String destinationId = principal.getName();
-        // 2. Распаковываем данные для логики сервисов
-        String[] parts = destinationId.split(":");
-        String userId = parts[0];
-        String username = (parts.length > 1) ? parts[1] : "Player_" + userId;
-        // 1. Проверяем роль через Authorities (которые заполнил Interceptor из JWT)
-        // Либо, если ты просто прокинул заголовок X-User-Role, проверяем его.
-        boolean isAdmin = usersService.findUserByUserName(username).getRoles().stream().anyMatch(a -> a.getName().equals("ROLE_ADMIN"));
-        System.out.println(isAdmin);
-        if (!isAdmin) {
-            this.template.convertAndSendToUser(destinationId, "/queue/alert", "You are not admin!");
-            return;
-        }
-        // 2. Проверка "не удаляй себя" по ID (теперь оба значения — это ID)
-        String currentAdminId = userId;
-        if (currentAdminId.equals(String.valueOf(targetUserId))) {
-            this.template.convertAndSendToUser(destinationId, "/queue/alert", "You cannot delete yourself!");
-            return;
-        }
-        // 3. Получаем имя удаляемого пользователя (нужно для очистки Mongo/GameService)
-        // Здесь usersService — это Feign-клиент к микросервису USERS
-        Users targetUser = usersService.findUserById(targetUserId);
-        String targetUsername = targetUser.getUsername();
-        // 4. Очистка игровых данных (локально в Тетрисе/Монго)
-        mongoService.cleanSavedGameMongodb(targetUsername);
-        mongoService.cleanImageMongodb(targetUsername, "");
-        mongoService.cleanImageMongodb(targetUsername, "deskTopSnapShot");
-        mongoService.cleanImageMongodb(targetUsername, "deskTopSnapShotBest");
-        gameService.deleteGameData(targetUsername);
-        // 5. Удаление самого пользователя в микросервисе USERS
-        usersService.deleteUser(targetUserId);
-        // 6. Обновляем список для всех админов
-        admin(principal);
+        if (principal == null) return;
+
+        // 🚀 Мгновенно уходим в фоновый виртуальный поток, полностью разгружая брокер WebSocket
+        applicationTaskExecutor.execute(() -> {
+            try {
+                String destinationId = principal.getName();
+                String[] parts = destinationId.split(":");
+                String userId = parts[0];
+                String username = (parts.length > 1) ? parts[1] : "Player_" + userId;
+
+                // 1. Безопасная проверка роли через единый стандарт (без префиксов-паразитов)
+                boolean isAdmin = usersService.findUserByUserName(username).getRoles().stream()
+                        .anyMatch(role -> "ADMIN".equals(role.getName()) || "ROLE_ADMIN".equals(role.getName()));
+
+                if (!isAdmin) {
+                    this.template.convertAndSendToUser(destinationId, "/queue/alert", "You are not admin!");
+                    return;
+                }
+
+                // 2. Проверка "не удаляй себя"
+                if (userId.equals(String.valueOf(targetUserId))) {
+                    this.template.convertAndSendToUser(destinationId, "/queue/alert", "You cannot delete yourself!");
+                    return;
+                }
+
+                log.info("🎯 Администратор {} инициировал удаление пользователя ID: {}", username, targetUserId);
+
+                // 3. Получаем имя удаляемого пользователя через Feign (Блокирующий I/O в Loom)
+                Users targetUser = usersService.findUserById(targetUserId);
+                if (targetUser == null) {
+                    this.template.convertAndSendToUser(destinationId, "/queue/alert", "Target user not found!");
+                    return;
+                }
+                String targetUsername = targetUser.getUsername();
+
+                // 4. Каскадная очистка игровых данных (gRPC / Feign вызовы эффективно паркуют поток Loom)
+                mongoService.cleanSavedGameMongodb(targetUsername);
+                mongoService.cleanImageMongodb(targetUsername, "");
+                mongoService.cleanImageMongodb(targetUsername, "deskTopSnapShot");
+                mongoService.cleanImageMongodb(targetUsername, "deskTopSnapShotBest");
+                gameService.deleteGameData(targetUsername);
+
+                // 5. Удаление самого пользователя в микросервисе USERS
+                usersService.deleteUser(targetUserId);
+
+                log.info("✅ Пользователь {} [ID: {}] успешно удален из всех подсистем", targetUsername, targetUserId);
+
+                // 6. Вызываем наш пакетный метод для мгновенного обновления панели у всех админов
+                admin(principal);
+
+            } catch (Exception e) {
+                log.error("💥 Крах операции удаления пользователя в виртуальном потоке: {}", e.getMessage(), e);
+                try {
+                    this.template.convertAndSendToUser(principal.getName(), "/queue/alert", "Error during deletion!");
+                } catch (Exception ignored) {}
+            }
+        });
     }
 
     @MessageMapping("/{moveId}")
