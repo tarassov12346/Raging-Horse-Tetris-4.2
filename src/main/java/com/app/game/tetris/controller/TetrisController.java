@@ -587,9 +587,34 @@ public class TetrisController {
     @MessageMapping("/record")
     public void makeRecord(Principal principal) {
         if (principal == null) return;
+
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
-        gameService.doRecord(playGameService.getState(userId).getGame());
-        log.info("record to DB is made for " + userId);
+
+        // 🚀 Мгновенно уходим в виртуальный поток Loom, освобождая брокер сокетов
+        applicationTaskExecutor.execute(() -> {
+            try {
+                // 1. Безопасно извлекаем текущее состояние из Hazelcast
+                var currentState = playGameService.getState(userId);
+
+                // Защита от NullPointerException, если игра уже завершена или стейт удален
+                if (currentState == null || currentState.getGame() == null) {
+                    log.warn("⚠️ Попытка фиксации рекорда для ID: {}, но активных игровых данных не найдено", userId);
+                    return;
+                }
+
+                log.info("🏆 Инициирована отправка финального счета в БД для игрока ID: {}", userId);
+
+                // 2. gRPC-вызов к PG-microservice (блокирующий сетевой I/O безопасно паркует поток Loom)
+                gameService.doRecord(currentState.getGame());
+
+                // Безопасное логирование через плейсхолдеры
+                log.info("✅ Рекорд успешно зафиксирован в PostgreSQL для пользователя ID: {}", userId);
+
+            } catch (Exception e) {
+                log.error("💥 Критическая ошибка при сохранении рекорда в gRPC-потоке: {}", e.getMessage(), e);
+            }
+        });
     }
+
 }
