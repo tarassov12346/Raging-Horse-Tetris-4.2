@@ -470,41 +470,70 @@ public class TetrisController {
 
     @MessageMapping("/save")
     public void gameSave(Principal principal) {
+        if (principal == null) return;
+
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
-        // 1. Сначала забираем текущее состояние игры
-        var currentState = playGameService.getState(userId);
-        if (currentState != null) {
-            // 2. Сохраняем логику в SavedGame
-            SavedGame savedGame = playGameService.saveGame(currentState.getGame(), currentState);
-            // Отправляем в Монго
-            mongoService.saveGame(savedGame);
-            playGameService.stopUserTask(userId);
-            // Уведомляем фронт
-            displayService.sendSavedStateToBeDisplayed(playGameService, template, destinationId);
-        }
+
+        // 🚀 Мгновенно уходим в виртуальный поток Loom, освобождая брокер сообщений
+        applicationTaskExecutor.execute(() -> {
+            try {
+                // ШАГ 1: Первым делом жестко останавливаем таймер падения фигур (замораживаем игру)
+                playGameService.stopUserTask(userId);
+
+                // ШАГ 2: Только после заморозки берем стабильное, статичное состояние
+                var currentState = playGameService.getState(userId);
+                if (currentState != null) {
+                    SavedGame savedGame = playGameService.saveGame(currentState.getGame(), currentState);
+
+                    // ШАГ 3: Отправляем дамп в MongoDB (блокирующий gRPC-вызов безопасно паркует поток Loom)
+                    mongoService.saveGame(savedGame);
+
+                    // Уведомляем фронтенд об успешном сохранении
+                    displayService.sendSavedStateToBeDisplayed(playGameService, template, destinationId);
+                    log.info("💾 Игра успешно сохранена в MongoDB для пользователя ID: {}", userId);
+                }
+            } catch (Exception e) {
+                log.error("💥 Ошибка при сохранении игры в виртуальном потоке: {}", e.getMessage(), e);
+            }
+        });
     }
 
     @MessageMapping("/restart")
     public void gameRestart(Principal principal) {
-        // 1. ПОЛУЧАЕМ ID МГНОВЕННО (из токена, проброшенного интерцептором)
+        if (principal == null) return;
+
         String destinationId = principal.getName();
-        // 2. Распаковываем данные для логики сервисов
         String[] parts = destinationId.split(":");
         String userId = parts[0];
         String playerName = (parts.length > 1) ? parts[1] : "Player_" + userId;
-        log.info("RESTARTED for " + playerName);
-        // 3. Запрашиваем у Монго сохраненную игру по имени
-        mongoService.gameRestart(playerName).ifPresent(savedGame -> {
-            // Восстанавливаем состояние из сохраненки
-            playGameService.setState(playGameService.recreateStateFromSavedGame(savedGame, userId), userId);
-            // Отправляем обновленный экран на фронт
-            displayService.sendStateToBeDisplayed(
-                    playGameService,
-                    gameService,
-                    template,
-                    destinationId
-            );
+
+        // 🚀 Переносим запрос к Монго в виртуальный поток Loom
+        applicationTaskExecutor.execute(() -> {
+            try {
+                log.info("🔄 Инициирован рестарт сессии для игрока: {}", playerName);
+
+                // Запрашиваем у MongoDB сохраненную игру (сетевое ожидание эффективно утилизирует Loom)
+                mongoService.gameRestart(playerName).ifPresentOrElse(savedGame -> {
+
+                    // Восстанавливаем состояние в распределенном кэше Hazelcast
+                    var recreatedState = playGameService.recreateStateFromSavedGame(savedGame, userId);
+                    playGameService.setState(recreatedState, userId);
+
+                    // ВАЖНО: Если игра была на паузе, здесь можно сразу запустить новый таймер падения,
+                    // либо дождаться от пользователя явной команды "start".
+                    // Сейчас мы просто обновляем экран фронтенда:
+                    displayService.sendStateToBeDisplayed(playGameService, gameService, template, destinationId);
+
+                    log.info("✅ Игровой процесс успешно восстановлен из MongoDB для {}", playerName);
+                }, () -> {
+                    log.warn("⚠️ Сохранений в MongoDB для игрока {} не найдено", playerName);
+                    this.template.convertAndSendToUser(destinationId, "/queue/alert", "No saved game found!");
+                });
+
+            } catch (Exception e) {
+                log.error("💥 Ошибка при восстановлении игры из MongoDB: {}", e.getMessage(), e);
+            }
         });
     }
 
