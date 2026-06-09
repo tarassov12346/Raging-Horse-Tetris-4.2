@@ -116,28 +116,47 @@ public class PlayGame implements PlayGameService {
     }
 
     @Override
-    public State dropDownState(State state, String userId) {
-        setState(dropDown(state).orElse(state), userId);
+    public boolean hasUserTask(String userId) {
+        ScheduledFuture<?> task = userTasks.get(userId);
+        return task != null && !task.isDone();
+    }
+
+    @Override
+    public State dropDownState(String userId) {
+        State currentState = getState(userId);
+        if (currentState != null) {
+            setState(dropDown(currentState).orElse(currentState), userId);
+        }
         return getState(userId);
     }
 
     @Override
-    public State moveRightState(State state, String userId) {
-        setState(moveRight(state).orElse(state), userId);
+    public State moveRightState(String userId) {
+        State currentState = getState(userId);
+        if (currentState != null) {
+            setState(moveRight(currentState).orElse(currentState), userId);
+        }
         return getState(userId);
     }
 
     @Override
-    public State moveLeftState(State state, String userId) {
-        setState(moveLeft(state).orElse(state), userId);
+    public State moveLeftState(String userId) {
+        State currentState = getState(userId);
+        if (currentState != null) {
+            setState(moveLeft(currentState).orElse(currentState), userId);
+        }
         return getState(userId);
     }
 
     @Override
-    public State rotateState(State state, String userId) {
-        setState(rotate(state).orElse(state), userId);
+    public State rotateState(String userId) {
+        State currentState = getState(userId);
+        if (currentState != null) {
+            setState(rotate(currentState).orElse(currentState), userId);
+        }
         return getState(userId);
     }
+
 
     @Override
     public Optional<State> moveDownState(State state) {

@@ -392,25 +392,33 @@ public class TetrisController {
 
         String destinationId = principal.getName();
         String userId = destinationId.split(":")[0];
-        var currentState = playGameService.getState(userId);
 
-        // Защита: если стейта нет и это не старт — выходим
-        if (currentState == null && !moveId.equals("start")) {
+        // Проверяем наличие активного таска (таймера) — это маркер запущенной игры
+        boolean hasActiveGame = playGameService.hasUserTask(userId);
+
+        // Защита: если игры нет и это не старт — игнорируем пакет
+        if (!hasActiveGame && !moveId.equals("start")) {
             return;
         }
 
         switch (moveId) {
             case "start" -> {
-                // Защита от NullPointerException, если стейт по какой-то причине еще не создался в /hello
-                if (currentState == null) {
+                // 🔥 Защита от повторного старта и утечки таймеров
+                if (hasActiveGame) {
+                    log.warn("⚠️ Игрок {} попытался запустить игру повторно. Запрос отклонен.", userId);
+                    return;
+                }
+
+                // Быстрая проверка первичной инициализации стейта
+                var state = playGameService.getState(userId);
+                if (state == null) {
                     log.warn("⚠️ Попытка старта игры без инициализированного стейта для ID: {}", userId);
                     return;
                 }
 
-                String playerName = currentState.getGame().getPlayerName();
+                String playerName = state.getGame().getPlayerName();
 
-                // 1. Асинхронно запрашиваем рекорды в виртуальном потоке.
-                // gRPC-вызов не затормозит запуск таймера.
+                // 1. Асинхронный gRPC запрос исторических рекордов в виртуальном потоке Loom
                 Thread.startVirtualThread(() -> {
                     try {
                         String rawData = gameService.getGameData(playerName);
@@ -426,11 +434,11 @@ public class TetrisController {
                             );
                         }
                     } catch (Exception e) {
-                        log.error("❌ Error parsing game data for {}: {}", playerName, e.getMessage());
+                        log.error("❌ Error fetching game data for {}: {}", playerName, e.getMessage());
                     }
                 });
 
-                // 2. Запуск таймера падения фигур (каждую секунду)
+                // 2. Безопасный запуск таймера автопадения фигур
                 ScheduledFuture<?> task = taskScheduler.scheduleAtFixedRate(
                         () -> displayService.sendStateToBeDisplayed(
                                 playGameService,
@@ -441,15 +449,19 @@ public class TetrisController {
                         Duration.ofMillis(1000)
                 );
                 playGameService.setUserTask(userId, task);
+                log.info("🎮 Игровой цикл успешно запущен для пользователя {}", playerName);
             }
-            // Движения остаются синхронными, так как они работают только с памятью (мапой состояний)
-            case "1" -> playGameService.setState(playGameService.rotateState(currentState, userId), userId);
-            case "2" -> playGameService.setState(playGameService.moveLeftState(currentState, userId), userId);
-            case "3" -> playGameService.setState(playGameService.moveRightState(currentState, userId), userId);
-            case "4" -> playGameService.setState(playGameService.dropDownState(currentState, userId), userId);
+
+            // 🔥 ВАЖНО: Мы больше не передаем currentState снаружи контроллера!
+            // Сервисы внутри себя атомарно извлекут из памяти актуальный стейт,
+            // избавляя игровой цикл от Race Condition.
+            case "1" -> playGameService.rotateState(userId);
+            case "2" -> playGameService.moveLeftState(userId);
+            case "3" -> playGameService.moveRightState(userId);
+            case "4" -> playGameService.dropDownState(userId);
         }
 
-        // Отправляем визуал (кроме start, так как там работает планировщик)
+        // Отправляем визуальное обновление на фронтенд (кроме старта)
         if (!moveId.equals("start")) {
             displayService.sendStateToBeDisplayed(playGameService, gameService, template, destinationId);
         }

@@ -17,13 +17,15 @@ public interface PlayGameService {
 
     State initiateState(String playerName, String userId);
 
-    State dropDownState(State state, String userId);
+    // 1. Добавляем метод проверки активности таймера
+    boolean hasUserTask(String userId);
 
-    State moveRightState(State state, String userId);
+    // 2. Изменяем сигнатуры методов движения (убираем передачу State снаружи)
+    State rotateState(String userId);
+    State moveLeftState(String userId);
+    State moveRightState(String userId);
+    State dropDownState(String userId);
 
-    State moveLeftState(State state, String userId);
-
-    State rotateState(State state, String userId);
 
     Optional<State> moveDownState(State state);
 
