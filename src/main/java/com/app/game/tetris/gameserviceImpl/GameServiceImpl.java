@@ -8,19 +8,19 @@ import com.app.service.grpc.GameRecordRequest;
 import com.app.service.grpc.PlayerRequest;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
-import org.springframework.scheduling.annotation.Async;
+import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
 public class GameServiceImpl implements GameService {
+
     @GrpcClient("game-service")
     private GameIntegrationServiceGrpc.GameIntegrationServiceBlockingStub gameStub;
 
-    private final GameClient gameClient; // Для record и delete
+    private final GameClient gameClient; // Декларативный Feign-клиент для удалений
 
     public GameServiceImpl(GameClient gameClient) {
         this.gameClient = gameClient;
@@ -28,72 +28,67 @@ public class GameServiceImpl implements GameService {
 
     @Override
     public String getGameData(String playerName) {
+        try {
+            log.info("🛰️ Запрос gRPC статистики для игрока: {}", playerName);
 
-            try {
-                log.info("🛰️ Запрос gRPC статистики для игрока: {}", playerName);
+            var request = PlayerRequest.newBuilder().setPlayerName(playerName).build();
+            var res = gameStub.getGameScore(request);
 
-                // 1. Делаем gRPC вызов
-                var request = PlayerRequest.newBuilder().setPlayerName(playerName).build();
-                var res = gameStub.getGameScore(request);
+            // 🔥 ОПТИМИЗАЦИЯ: Безопасная сборка через нативный JSONObject (исключает ошибки синтаксиса JSON)
+            JSONObject json = new JSONObject();
+            json.put("bestplayer", res.getBestPlayer());
+            json.put("bestscore", res.getBestScore());
+            json.put("playerbestscore", res.getPlayerBestScore());
+            json.put("playerAttemptsNumber", res.getPlayerAttemptsNumber());
 
-                // 2. Формируем JSON-строку вручную (как того хочет JSONObject в контроллере)
-                // Важно: ключи "bestplayer" и "bestscore" должны быть маленькими буквами
-                return String.format(
-                        "{\"bestplayer\":\"%s\",\"bestscore\":%d,\"playerbestscore\":%d,\"playerAttemptsNumber\":%d}",
-                        res.getBestPlayer(),
-                        res.getBestScore(),
-                        res.getPlayerBestScore(),
-                        res.getPlayerAttemptsNumber()
-                );
-            } catch (Exception e) {
-                log.error("❌ Ошибка gRPC при получении данных: {}", e.getMessage());
-                // Возвращаем пустой объект, чтобы JSONObject не упал при парсинге
-                return "{}";
-            }
-
+            return json.toString();
+        } catch (Exception e) {
+            log.error("❌ Ошибка gRPC при получении данных игрока {}: {}", playerName, e.getMessage());
+            return "{}";
+        }
     }
 
     @Override
     public List<com.app.game.tetris.model.Game> getAllGames() {
         log.info("📦 Запрос полного списка игр через gRPC");
         try {
-            // 1. Делаем вызов к микросервису через gRPC стаб
             var response = gameStub.getAllGames(Empty.newBuilder().build());
 
-            // 2. Превращаем gRPC-ответы в объекты модели твоего приложения
-            return response.getGamesList().stream()
+            // 🔥 ЗАЩИТА ОТ THREAD PINNING: Убираем лог из каждой итерации маппинга
+            List<com.app.game.tetris.model.Game> games = response.getGamesList().stream()
                     .map(g -> {
-                        log.info("🔍 Маппинг игры: id={}, player={}", g.getId(), g.getPlayerName());
-                        // Создаем объект Game (используем конструктор: playerName, playerScore)
                         var game = new com.app.game.tetris.model.Game(g.getPlayerName(), g.getPlayerScore());
-
-                        // Устанавливаем ID (в gRPC это int64, в Java Long — должно совпасть)
                         game.setId(g.getId());
-
                         return game;
                     })
                     .toList();
 
+            log.info("🎯 Успешно смапплено {} игр из gRPC-канала", games.size());
+            return games;
+
         } catch (Exception e) {
             log.error("❌ Ошибка при получении списка игр по gRPC: {}", e.getMessage());
-            // Возвращаем пустой список, чтобы контроллер и админка не "упали"
             return List.of();
         }
     }
 
-    @Async
+    // 🔥 ИСПРАВЛЕНИЕ: Убираем @Async, так как метод уже изолирован в Loom-экзекуторе контроллера
     @Override
     public void deleteGameData(String playerName) {
-        gameClient.deleteGameData(playerName);
+        try {
+            log.info("🗑️ Вызов каскадного удаления Feign для игрока: {}", playerName);
+            gameClient.deleteGameData(playerName);
+        } catch (Exception e) {
+            log.error("❌ Ошибка Feign при каскадном удалении данных: {}", e.getMessage());
+        }
     }
 
-    @Async
+    // 🔥 ИСПРАВЛЕНИЕ: Убираем @Async, управление потоком полностью контролирует loomExecutor контроллера
     @Override
     public void doRecord(com.app.game.tetris.model.Game game) {
         try {
-            log.info("🏆 gRPC: Сохранение рекорда...");
+            log.info("🏆 gRPC: Сохранение рекорда для игрока: {}", game.getPlayerName());
 
-            // ВАЖНО: используем именно GameRecordRequest (как в новом .proto)
             var request = GameRecordRequest.newBuilder()
                     .setPlayerName(game.getPlayerName())
                     .setPlayerScore(game.getPlayerScore())
@@ -106,4 +101,3 @@ public class GameServiceImpl implements GameService {
         }
     }
 }
-
