@@ -5,7 +5,6 @@ import com.app.game.tetris.model.Users;
 import com.app.game.tetris.users_service.UsersService;
 import com.app.grpc.*;
 import io.grpc.StatusRuntimeException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.stereotype.Service;
@@ -16,8 +15,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
-public class UsersServiceImpl implements UsersService{
+public class UsersServiceImpl implements UsersService {
 
     @GrpcClient("users-service")
     private UserServiceGrpc.UserServiceBlockingStub userStub;
@@ -26,9 +24,9 @@ public class UsersServiceImpl implements UsersService{
     public void deleteUser(Long userId) {
         try {
             userStub.deleteUser(IdRequest.newBuilder().setId(userId).build());
-            log.info("🗑 Пользователь с ID {} удален", userId);
+            log.info("🗑 Пользователь с ID {} успешно удален через gRPC", userId);
         } catch (StatusRuntimeException e) {
-            log.error("❌ Ошибка gRPC при удалении: {}", e.getStatus());
+            log.error("❌ Ошибка gRPC при удалении пользователя {}: {}", userId, e.getStatus());
         }
     }
 
@@ -38,7 +36,7 @@ public class UsersServiceImpl implements UsersService{
             UserResponse response = userStub.findById(IdRequest.newBuilder().setId(userId).build());
             return response.getExists() ? mapToAppModel(response.getUser()) : null;
         } catch (StatusRuntimeException e) {
-            log.error("❌ Ошибка gRPC при поиске по ID: {}", e.getStatus());
+            log.error("❌ Ошибка gRPC при поиске по ID {}: {}", userId, e.getStatus());
             return null;
         }
     }
@@ -49,7 +47,7 @@ public class UsersServiceImpl implements UsersService{
             UserResponse response = userStub.findByUsername(SearchRequest.newBuilder().setValue(userName).build());
             return response.getExists() ? mapToAppModel(response.getUser()) : null;
         } catch (StatusRuntimeException e) {
-            log.error("❌ Ошибка gRPC при поиске по имени: {}", e.getStatus());
+            log.error("❌ Ошибка gRPC при поиске по имени {}: {}", userName, e.getStatus());
             return null;
         }
     }
@@ -58,23 +56,30 @@ public class UsersServiceImpl implements UsersService{
     public List<Users> getAllUsers() {
         try {
             UserListResponse response = userStub.getAllUsers(UserEmpty.newBuilder().build());
-            return response.getUsersList().stream()
+
+            List<Users> users = response.getUsersList().stream()
                     .map(this::mapToAppModel)
                     .toList();
+
+            log.info("🎯 Из gRPC-канала users-service успешно извлечено {} профилей", users.size());
+            return users;
         } catch (StatusRuntimeException e) {
             log.error("❌ Ошибка gRPC при получении списка пользователей: {}", e.getStatus());
             return List.of();
         }
     }
 
-    // --- Мапперы (Конвертация данных) ---
+    // --- Оптимизированный безопасный маппер ---
     private Users mapToAppModel(UserMsg msg) {
         Users user = new Users();
         user.setId(msg.getId());
         user.setUsername(msg.getUsername());
-        user.setPassword(msg.getPassword());
-        user.setPasswordConfirm(msg.getPasswordConfirm());
 
+        // 🔥 ЗАЩИТА ДАННЫХ: Пароли обнуляем, игровому движку они не нужны по стандарту PCI-DSS / OWASP
+        user.setPassword(null);
+        user.setPasswordConfirm(null);
+
+        // Безопасный маппинг сета ролей для админки
         Set<Roles> roles = msg.getRolesList().stream()
                 .map(r -> new Roles(r.getId(), r.getName()))
                 .collect(Collectors.toSet());
@@ -83,21 +88,5 @@ public class UsersServiceImpl implements UsersService{
         return user;
     }
 
-    private UserMsg mapToMsg(Users user) {
-        UserMsg.Builder builder = UserMsg.newBuilder()
-                .setUsername(user.getUsername())
-                .setPassword(user.getPassword())
-                .setPasswordConfirm(user.getPasswordConfirm() != null ? user.getPasswordConfirm() : "");
-
-        if (user.getId() != null) {
-            builder.setId(user.getId());
-        }
-        if (user.getRoles() != null) {
-            List<RoleMsg> roleMsgs = user.getRoles().stream()
-                    .map(r -> RoleMsg.newBuilder().setId(r.getId()).setName(r.getName()).build())
-                    .toList();
-            builder.addAllRoles(roleMsgs);
-        }
-        return builder.build();
-    }
+    // 🔥 ОПТИМИЗАЦИЯ: Неиспользуемый метод mapToMsg удален (Dead Code Cleanup)
 }
