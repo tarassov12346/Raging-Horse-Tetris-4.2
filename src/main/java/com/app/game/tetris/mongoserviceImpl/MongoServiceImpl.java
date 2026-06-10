@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
@@ -32,7 +33,6 @@ public class MongoServiceImpl implements MongoService {
         this.mongoFeignClient = mongoFeignClient;
     }
 
-    // ТЕПЕРЬ СИНХРОННО: этот метод будет вызван внутри виртуального потока контроллера
     @Override
     public void loadSnapShotIntoMongodb(String playerName, String fileName) {
         String pathToShots = System.getProperty("user.dir") + shotsPath;
@@ -46,29 +46,39 @@ public class MongoServiceImpl implements MongoService {
                     .build();
 
             log.info("🛰 Отправка скриншота {} через gRPC для игрока {}", fileName, playerName);
-            SnapshotResponse response = snapshotStub.uploadSnapShot(request);
+
+            // 🔥 ОПТИМИЗАЦИЯ: Принудительный дедлайн на 10 секунд для защиты от зависания потоков Loom
+            SnapshotResponse response = snapshotStub
+                    .withDeadlineAfter(10, TimeUnit.SECONDS)
+                    .uploadSnapShot(request);
 
             if (response.getSuccess()) {
                 log.info("✅ gRPC ответ: {}", response.getMessage());
             }
         } catch (IOException e) {
-            log.error("❌ Ошибка чтения файла: {}", e.getMessage());
+            log.error("❌ Ошибка файловой системы при чтению скриншота: {}", e.getMessage());
         } catch (Exception e) {
-            log.error("❌ Ошибка gRPC вызова: {}", e.getMessage());
+            log.error("❌ Ошибка gRPC при отправке скриншота {}: {}", fileName, e.getMessage());
         }
     }
 
-    // БЕЗ @Async: Контроллер сам упакует этот вызов в виртуальный поток
     @Override
     public void prepareMongoDBForNewPLayer(String playerName) {
-        log.info("🪄 Подготовка БД для игрока: {}", playerName);
-        mongoFeignClient.prepareMongoDBForNewPLayer(playerName);
+        try {
+            log.info("🪄 Подготовка БД для игрока: {}", playerName);
+            mongoFeignClient.prepareMongoDBForNewPLayer(playerName);
+        } catch (Exception e) {
+            log.error("❌ Ошибка Feign при подготовке БД для {}: {}", playerName, e.getMessage());
+        }
     }
 
-    // БЕЗ @Async
     @Override
     public void cleanSavedGameMongodb(String playerName) {
-        mongoFeignClient.cleanSavedGameMongodb(playerName);
+        try {
+            mongoFeignClient.cleanSavedGameMongodb(playerName);
+        } catch (Exception e) {
+            log.error("❌ Ошибка Feign при очистке сохраненной игры для {}: {}", playerName, e.getMessage());
+        }
     }
 
     @Override
@@ -84,10 +94,11 @@ public class MongoServiceImpl implements MongoService {
                 .build();
 
         try {
-            snapshotStub.saveGame(request);
-            log.info("💾 Игра игрока {} сохранена через gRPC", savedGame.getPlayerName());
+            // 🔥 ОПТИМИЗАЦИЯ: Дедлайн на 5 секунд для сохранения текстовой матрицы
+            snapshotStub.withDeadlineAfter(5, TimeUnit.SECONDS).saveGame(request);
+            log.info("💾 Игра игрока {} успешно сохранена через gRPC дамп", savedGame.getPlayerName());
         } catch (Exception e) {
-            log.error("❌ Ошибка gRPC при сохранении игры: {}", e.getMessage());
+            log.error("❌ Ошибка gRPC при сохранении игры для {}: {}", savedGame.getPlayerName(), e.getMessage());
         }
     }
 
@@ -100,7 +111,10 @@ public class MongoServiceImpl implements MongoService {
                 .build();
 
         try {
-            GetSavedGameResponse response = snapshotStub.getSavedGame(request);
+            // 🔥 ОПТИМИЗАЦИЯ: Дедлайн 5 секунд на восстановление стейта
+            GetSavedGameResponse response = snapshotStub
+                    .withDeadlineAfter(5, TimeUnit.SECONDS)
+                    .getSavedGame(request);
 
             if (response.getFound()) {
                 char[][] cells = response.getRowsList().stream()
@@ -110,24 +124,34 @@ public class MongoServiceImpl implements MongoService {
                 return Optional.of(new SavedGame(response.getPlayerName(), response.getPlayerScore(), cells));
             }
         } catch (Exception e) {
-            log.error("❌ Ошибка gRPC при загрузке игры: {}", e.getMessage());
+            log.error("❌ Ошибка gRPC при загрузке сохраненной игры для {}: {}", playerName, e.getMessage());
         }
         return Optional.empty();
     }
 
     @Override
     public void cleanImageMongodb(String playerName, String fileName) {
-        mongoFeignClient.cleanImageMongodb(playerName, fileName);
+        try {
+            mongoFeignClient.cleanImageMongodb(playerName, fileName);
+        } catch (Exception e) {
+            log.error("❌ Ошибка Feign при удалении медиа контента для {}: {}", playerName, e.getMessage());
+        }
     }
 
     @Override
     public void loadMugShotIntoMongodb(String playerName, byte[] data) {
-        MugShotRequest request = MugShotRequest.newBuilder()
-                .setPlayerName(playerName)
-                .setData(ByteString.copyFrom(data))
-                .build();
-        snapshotStub.uploadMugShot(request);
-        log.info("👤 MugShot отправлен через gRPC для {}", playerName);
+        try {
+            MugShotRequest request = MugShotRequest.newBuilder()
+                    .setPlayerName(playerName)
+                    .setData(ByteString.copyFrom(data))
+                    .build();
+
+            // 🔥 ОПТИМИЗАЦИЯ: Дедлайн 10 секунд на тяжелую загрузку аватара
+            snapshotStub.withDeadlineAfter(10, TimeUnit.SECONDS).uploadMugShot(request);
+            log.info("👤 MugShot успешно отправлен через gRPC для {}", playerName);
+        } catch (Exception e) {
+            log.error("❌ Ошибка gRPC при загрузке аватара MugShot для {}: {}", playerName, e.getMessage());
+        }
     }
 
     @Override
@@ -136,6 +160,19 @@ public class MongoServiceImpl implements MongoService {
                 .setPlayerName(playerName)
                 .setFileName(fileName)
                 .build();
-        return snapshotStub.downloadBytes(request).getData().toByteArray();
+        try {
+            // 🔥 ОПТИМИЗАЦИЯ: Защитный дедлайн на скачивание тяжелой графики из базы
+            var response = snapshotStub.withDeadlineAfter(10, TimeUnit.SECONDS).downloadBytes(request);
+
+            // Защитный барьер: если прилетел пустой пакет, не плодим массивы в памяти
+            if (response.getData() == null || response.getData().isEmpty()) {
+                return new byte[0];
+            }
+
+            return response.getData().toByteArray();
+        } catch (Exception e) {
+            log.error("❌ Ошибка gRPC при скачивании бинарных данных ({}) для {}: {}", fileName, playerName, e.getMessage());
+            return new byte[0]; // Возвращаем пустой массив, защищая контроллер от краша
+        }
     }
 }
