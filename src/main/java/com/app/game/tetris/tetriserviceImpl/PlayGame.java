@@ -78,26 +78,37 @@ public class PlayGame implements PlayGameService {
 
     @Override
     public State createStateAfterMoveDown(State state, GameService gameService, String userId) {
-        Optional<State> moveDownState = moveDownState(state);
+        // 🔥 ХИТРЫЙ ТРЮК: Игнорируем входящий аргумент 'state'!
+        // Вместо него берём самый актуальный стейт из Hazelcast, который учитывает ВСЕ свежие повороты игрока
+        State freshState = getState(userId);
+
+        // Защитный барьер, если игра уже закрыта или удалена
+        if (freshState == null) {
+            return null;
+        }
+
+        // Двигаем вниз именно СВЕЖИЙ стейт, в который только что записался ручной поворот
+        Optional<State> moveDownState = moveDown(freshState, getStepDown(freshState));
+
         if (moveDownState.isEmpty()) {
-            Optional<State> newTetraminoState = newTetraminoState(state);
+            Optional<State> newTetraminoState = newTetraminoState(freshState);
             if (newTetraminoState.isEmpty()) {
                 // GAME OVER - фигур больше нет
-                state = buildState(state.getStage(), false, state.getGame());
-                // Сохраняем рекорд
-                //        gameService.doRecord(state.getGame());
+                freshState = buildState(freshState.getStage(), false, freshState.getGame());
+
                 // ОСТАНАВЛИВАЕМ ТАЙМЕР (Loom-way)
-                // Вызываем метод, который мы создали в PlayGameService для очистки ресурсов
                 this.removeStateForUser(userId);
-                setState(state, userId);
+                setState(freshState, userId);
                 return getState(userId);
             } else {
-                state = newTetraminoState.orElse(state);
+                freshState = newTetraminoState.orElse(freshState);
             }
         } else {
-            state = moveDownState.orElse(state);
+            freshState = moveDownState.orElse(freshState);
         }
-        setState(state, userId);
+
+        // Сохраняем обновленное состояние с принудительным шагом вниз
+        setState(freshState, userId);
         return getState(userId);
     }
 

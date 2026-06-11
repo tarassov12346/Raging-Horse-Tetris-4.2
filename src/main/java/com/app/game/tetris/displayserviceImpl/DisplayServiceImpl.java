@@ -8,33 +8,38 @@ import com.app.game.tetris.gameservice.GameService;
 import com.app.game.tetris.model.Game;
 import com.app.game.tetris.model.State;
 import com.app.game.tetris.tetriservice.PlayGameService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class DisplayServiceImpl implements DisplayService {
 
     @Override
     public void sendStateToBeDisplayed(PlayGameService playGameService, GameService gameService, SimpMessagingTemplate template, String destinationId) {
         String[] parts = destinationId.split(":");
         String userId = parts[0];
-        // Обновляем состояние
-        State state = playGameService.createStateAfterMoveDown(playGameService.getState(userId), gameService, userId);
+
+        // 🔥 ИСПРАВЛЕНИЕ RACE CONDITION: Извлекаем актуальное состояние,
+        // но НЕ мутируем его и не вызываем setState здесь! Это задача PlayGameService.
+        State state = playGameService.getState(userId);
+
         if (state == null) {
-            System.out.println("Попытка отрисовать несуществующее состояние для юзера: " + userId);
-            return; // Просто выходим, не роняя приложение
+            log.warn("⚠️ [Display] Попытка отрисовать несуществующее состояние для пользователя ID: {}", userId);
+            return;
         }
-        playGameService.setState(state, userId);
-        // Формируем визуал
+
+        // Формируем визуал на основе стабильного кадра
         char[][] cells = playGameService.drawTetraminoOnCells(state);
-        // 3. Создаем рекорд СРАЗУ с нужными полями
+
         GameStateDTO stateRecord = new GameStateDTO(
                 state.getGame().getPlayerName(),
                 state.getGame().getPlayerScore(),
                 state.isRunning(),
                 cells
         );
-        // 4. Отправляем рекорд напрямую пользователю
+
         template.convertAndSendToUser(destinationId, "/queue/stateObjects", stateRecord);
     }
 
@@ -42,18 +47,24 @@ public class DisplayServiceImpl implements DisplayService {
     public void sendFinalStateToBeDisplayed(PlayGameService playGameService, SimpMessagingTemplate template, String destinationId) {
         String[] parts = destinationId.split(":");
         String userId = parts[0];
-        // Получаем текущее состояние
+
         State state = playGameService.getState(userId);
-        // Формируем финальный визуал
+
+        // 🔥 ЗАЩИТА ОТ NULL: Предотвращаем краш потока Loom при Game Over
+        if (state == null) {
+            log.warn("⚠️ [Display] Финальный кадр запрошен, но стейт для ID: {} уже удален", userId);
+            return;
+        }
+
         char[][] cells = playGameService.drawTetraminoOnCells(state);
-        // Создаем рекорд GameStateDTO (тот же, что и для обычного стейта)
+
         GameStateDTO finalRecord = new GameStateDTO(
                 state.getGame().getPlayerName(),
                 state.getGame().getPlayerScore(),
-                state.isRunning(), // Здесь обычно будет false, так как это финал
+                false, // Явно форсируем false для финала
                 cells
         );
-        // Отправляем рекорд в топик финального состояния
+
         template.convertAndSendToUser(destinationId, "/queue/stateFinal", finalRecord);
     }
 
@@ -61,46 +72,40 @@ public class DisplayServiceImpl implements DisplayService {
     public void sendSavedStateToBeDisplayed(PlayGameService playGameService, SimpMessagingTemplate template, String destinationId) {
         String[] parts = destinationId.split(":");
         String userId = parts[0];
-        // 1. Получаем текущее состояние из памяти
+
         var state = playGameService.getState(userId);
         if (state == null) {
-            System.out.println("Попытка отрисовать несуществующее состояние для юзера: " + userId);
-            return; // Просто выходим, не роняя приложение
+            log.warn("⚠️ [Display] Попытка сохранить визуализацию для несуществующего ID: {}", userId);
+            return;
         }
-        // 2. Генерируем матрицу (визуал)
+
         char[][] cells = playGameService.drawTetraminoOnCells(state);
 
-        // 3. Создаем рекорд GameStateDTO вместо тяжелого State
         GameStateDTO savedRecord = new GameStateDTO(
                 state.getGame().getPlayerName(),
                 state.getGame().getPlayerScore(),
                 state.isRunning(),
                 cells
         );
-        // 4. Отправляем компактный рекорд напрямую пользователю
+
         template.convertAndSendToUser(destinationId, "/queue/stateSaved", savedRecord);
     }
 
-
     @Override
     public void sendDaoGameToBeDisplayed(GameDataDTO gameData, SimpMessagingTemplate template, String destinationId) {
-        // Рекорды в Java 21 имеют отличный встроенный toString() для логирования
-        System.out.println("DEBUG: Sending GameDataDTO to " + destinationId);
-        System.out.println("Payload: " + gameData);
+        // 🔥 ЗАЩИТА ОТ PINNING: Заменяем System.out на асинхронный логгер через {}
+        log.debug("📡 Отправка GameDataDTO для {}. Данные: {}", destinationId, gameData);
         try {
-            // Spring Boot 3.4 через Jackson автоматически сериализует рекорд в JSON
             template.convertAndSend("/topic/daoGameObjects", gameData);
         } catch (Exception e) {
-            System.err.println("CRITICAL: Failed to send WebSocket message to " + destinationId);
-            e.printStackTrace();
+            log.error("💥 КРИТИКА: Сбой отправки WebSocket сообщения в общую тему для {}: {}", destinationId, e.getMessage());
         }
     }
 
     @Override
     public void sendGameToBeDisplayed(Game game, SimpMessagingTemplate template, String userId) {
-        // Создаем легкий рекорд, беря только имя игрока
+        if (game == null) return;
         PlayerHelloDTO helloRecord = new PlayerHelloDTO(game.getPlayerName());
-        // Отправляем ТОЛЬКО имя (в формате JSON { "playerName": "..." })
         template.convertAndSendToUser(userId, "/queue/gameObjects", helloRecord);
     }
 }

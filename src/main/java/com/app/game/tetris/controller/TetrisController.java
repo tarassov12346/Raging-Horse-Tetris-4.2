@@ -439,26 +439,46 @@ public class TetrisController {
                 });
 
                 // 2. Безопасный запуск таймера автопадения фигур
+                // 2. Безопасный запуск таймера автопадения фигур (Project Loom / TaskScheduler)
                 ScheduledFuture<?> task = taskScheduler.scheduleAtFixedRate(
-                        () -> displayService.sendStateToBeDisplayed(
-                                playGameService,
-                                gameService,
-                                template,
-                                destinationId
-                        ),
+                        () -> {
+                            try {
+                                // ШАГ A: Бизнес-логика атомарно рассчитывает шаг падения вниз в распределенной мапе
+                                // (Этот метод вернет измененный State, либо зафиксирует Game Over)
+                                playGameService.createStateAfterMoveDown(playGameService.getState(userId), gameService, userId);
+
+                                // ШАГ Б: Чистый Read-Only слой отображения отправляет обновленный стейт на фронтенд
+                                displayService.sendStateToBeDisplayed(playGameService, gameService, template, destinationId);
+
+                            } catch (Exception e) {
+                                log.error("💥 Ошибка внутри фонового тика игрового таймера для пользователя {}: {}", userId, e.getMessage());
+                            }
+                        },
                         Duration.ofMillis(1000)
                 );
                 playGameService.setUserTask(userId, task);
-                log.info("🎮 Игровой цикл успешно запущен для пользователя {}", playerName);
+                log.info("🎮 Игровой цикл и автоматический планировщик падения успешно запущены для пользователя {}", playerName);
+
             }
 
             // 🔥 ВАЖНО: Мы больше не передаем currentState снаружи контроллера!
             // Сервисы внутри себя атомарно извлекут из памяти актуальный стейт,
             // избавляя игровой цикл от Race Condition.
-            case "1" -> playGameService.rotateState(userId);
-            case "2" -> playGameService.moveLeftState(userId);
-            case "3" -> playGameService.moveRightState(userId);
-            case "4" -> playGameService.dropDownState(userId);
+            // Вместо старых одиночных вызовов, совмещаем ручной ход с автоматическим падением вниз
+            case "1" -> {
+                playGameService.rotateState(userId); // Повернули
+                playGameService.createStateAfterMoveDown(playGameService.getState(userId), gameService, userId); // Сразу толкнули вниз
+            }
+            case "2" -> {
+                playGameService.moveLeftState(userId); // Сдвинули влево
+                playGameService.createStateAfterMoveDown(playGameService.getState(userId), gameService, userId); // Сразу толкнули вниз
+            }
+            case "3" -> {
+                playGameService.moveRightState(userId); // Сдвинули вправо
+                playGameService.createStateAfterMoveDown(playGameService.getState(userId), gameService, userId); // Сразу толкнули вниз
+            }
+            case "4" -> playGameService.dropDownState(userId); // Мгновенный сброс (Hard Drop) сам по себе хардкорен
+
         }
 
         // Отправляем визуальное обновление на фронтенд (кроме старта)
