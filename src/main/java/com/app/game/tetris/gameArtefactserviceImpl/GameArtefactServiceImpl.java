@@ -3,7 +3,6 @@ package com.app.game.tetris.gameArtefactserviceImpl;
 import com.app.game.tetris.gameArtefactservice.GameArtefactService;
 import com.app.game.tetris.model.State;
 import com.app.game.tetris.tetriservice.PlayGameService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
@@ -19,7 +18,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
 @Service
