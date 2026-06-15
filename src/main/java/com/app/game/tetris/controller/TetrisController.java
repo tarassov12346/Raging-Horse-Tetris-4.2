@@ -580,28 +580,33 @@ public class TetrisController {
                 int bestScore = jsonGameData.optInt("bestscore", 0);
                 int playerBestScore = jsonGameData.optInt("playerbestscore", 0);
 
-                // 2. Делаем обычный скриншот (в виртуальном потоке блокировка I/O абсолютно бесплатна)
-                gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", playGameService, currentState, bestPlayer, bestScore);
+                // 2. Делаем обычный скриншот
+                // 🔥 МЕГА-УЛУЧШЕНИЕ: Вызываем .join(). Виртуальный поток СТОИТ И ЖДЕТ,
+                // пока Playwright физически не отрапортует, что файл лег на диск!
+                gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", playGameService, currentState, bestPlayer, bestScore).join();
 
-                // Эти методы помечены @Async, они отработают параллельно в своих виртуальных потоках
+                // Теперь никакого Race Condition: файл СТОПРОЦЕНТНО на диске. Читаем его и пишем в Mongo
                 mongoService.cleanImageMongodb(playerName, "deskTopSnapShot");
                 mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShot");
 
-                // 3. Если побит личный рекорд — делаем "Best" скриншот
+                // 3. Если побит личный рекорд — делаем "Best" скриншот по такой же железной схеме
                 if (currentState.getGame().getPlayerScore() >= playerBestScore) {
-                    gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", playGameService, currentState, bestPlayer, bestScore);
+                    // Ждем завершения записи рекордного кадра
+                    gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", playGameService, currentState, bestPlayer, bestScore).join();
+
                     mongoService.cleanImageMongodb(playerName, "deskTopSnapShotBest");
                     mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShotBest");
                 }
 
                 // 4. Отправляем финальный экран пользователю
                 displayService.sendFinalStateToBeDisplayed(playGameService, template, destinationId);
-                log.info("📸 Скриншоты для {} успешно обработаны в виртуальном потоке", playerName);
+                log.info("📸 Скриншоты для {} успешно обработаны в виртуальном потоке через CompletableFuture.join()", playerName);
 
             } catch (Exception e) {
                 log.error("💥 Ошибка при создании скриншотов для {}: {}", playerName, e.getMessage());
             }
         });
+
     }
 
     @MessageMapping("/record")
