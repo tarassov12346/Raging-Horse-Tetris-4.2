@@ -16,9 +16,30 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.IntStream;
 
+
+
 @Service
 public class PlayGame implements PlayGameService {
     private static final Logger log = LoggerFactory.getLogger(PlayGame.class);
+
+    // 🔥 ОПТИМИЗАЦИЯ ПАМЯТИ: Статический пул, чтобы не плодить HashMap на каждый спавн фигуры
+    private static final Map<Character, Tetramino> TETRAMINO_POOL = new HashMap<>();
+    private static final char[] TETRAMINO_KEYS = "IJLOSTZK".toCharArray();
+    private static final Random RANDOM = new Random();
+
+    static {
+        TETRAMINO_POOL.put('0', new Tetramino(new char[][]{{'0'}}));
+        TETRAMINO_POOL.put('I', new Tetramino(new char[][]{{'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}}));
+        TETRAMINO_POOL.put('J', new Tetramino(new char[][]{{'0', 'J', '0'}, {'0', 'J', '0'}, {'J', 'J', '0'}}));
+        TETRAMINO_POOL.put('L', new Tetramino(new char[][]{{'0', 'L', '0'}, {'0', 'L', '0'}, {'0', 'L', 'L'}}));
+        TETRAMINO_POOL.put('O', new Tetramino(new char[][]{{'O', 'O'}, {'O', 'O'}}));
+        TETRAMINO_POOL.put('S', new Tetramino(new char[][]{{'0', 'S', 'S'}, {'S', 'S', '0'}, {'0', '0', '0'}}));
+        TETRAMINO_POOL.put('T', new Tetramino(new char[][]{{'0', '0', '0'}, {'T', 'T', 'T'}, {'0', 'T', '0'}}));
+        TETRAMINO_POOL.put('Z', new Tetramino(new char[][]{{'Z', 'Z', '0'}, {'0', 'Z', 'Z'}, {'0', '0', '0'}}));
+        TETRAMINO_POOL.put('K', new Tetramino(new char[][]{{'K', 'K', 'K'}, {'0', 'K', '0'}, {'0', 'K', '0'}}));
+    }
+
+
     @Value("${width}")
     int WIDTH;
     @Value("${height}")
@@ -27,13 +48,11 @@ public class PlayGame implements PlayGameService {
     private final TaskScheduler taskScheduler;
     private final IMap<String, State> userStates;
 
-    // Внедряем зависимости через один конструктор
     public PlayGame(TaskScheduler taskScheduler, HazelcastInstance hazelcastInstance) {
         this.taskScheduler = taskScheduler;
         this.userStates = hazelcastInstance.getMap("user-states");
     }
 
-    // Храним не экзекуторы, а Future задачи (чтобы можно было отменить)
     private final ConcurrentHashMap<String, ScheduledFuture<?>> userTasks = new ConcurrentHashMap<>();
 
     @Override
@@ -43,12 +62,9 @@ public class PlayGame implements PlayGameService {
 
     @Override
     public void stopUserTask(String userId) {
-        // .remove() сразу достает задачу и удаляет её из мапы
         ScheduledFuture<?> task = userTasks.remove(userId);
         if (task != null) {
-            // cancel(true) останавливает выполнение, даже если поток "спит"
             boolean cancelled = task.cancel(true);
-
             if (cancelled) {
                 log.info("Loom-таск для пользователя {} успешно остановлен", userId);
             }
@@ -62,7 +78,7 @@ public class PlayGame implements PlayGameService {
         userStates.remove(userId);
         ScheduledFuture<?> task = userTasks.remove(userId);
         if (task != null) {
-            task.cancel(false); // Мягко останавливаем таймер падения фигур
+            task.cancel(false);
         }
     }
 
@@ -78,25 +94,18 @@ public class PlayGame implements PlayGameService {
 
     @Override
     public State createStateAfterMoveDown(State state, GameService gameService, String userId) {
-        // 🔥 ХИТРЫЙ ТРЮК: Игнорируем входящий аргумент 'state'!
-        // Вместо него берём самый актуальный стейт из Hazelcast, который учитывает ВСЕ свежие повороты игрока
         State freshState = getState(userId);
 
-        // Защитный барьер, если игра уже закрыта или удалена
         if (freshState == null) {
             return null;
         }
 
-        // Двигаем вниз именно СВЕЖИЙ стейт, в который только что записался ручной поворот
         Optional<State> moveDownState = moveDown(freshState, getStepDown(freshState));
 
         if (moveDownState.isEmpty()) {
             Optional<State> newTetraminoState = newTetraminoState(freshState);
             if (newTetraminoState.isEmpty()) {
-                // GAME OVER - фигур больше нет
                 freshState = buildState(freshState.getStage(), false, freshState.getGame());
-
-                // ОСТАНАВЛИВАЕМ ТАЙМЕР (Loom-way)
                 this.removeStateForUser(userId);
                 setState(freshState, userId);
                 return getState(userId);
@@ -107,7 +116,6 @@ public class PlayGame implements PlayGameService {
             freshState = moveDownState.orElse(freshState);
         }
 
-        // Сохраняем обновленное состояние с принудительным шагом вниз
         setState(freshState, userId);
         return getState(userId);
     }
@@ -158,7 +166,6 @@ public class PlayGame implements PlayGameService {
         }
         return getState(userId);
     }
-
     @Override
     public State rotateState(String userId) {
         State currentState = getState(userId);
@@ -167,7 +174,6 @@ public class PlayGame implements PlayGameService {
         }
         return getState(userId);
     }
-
 
     @Override
     public Optional<State> moveDownState(State state) {
@@ -209,24 +215,30 @@ public class PlayGame implements PlayGameService {
 
     @Override
     public char[][] drawTetraminoOnCells(State state) {
-        //  final char[][] c = Arrays.stream(cells).map(char[]::clone).toArray(char[][]::new); // copy
-        final char[][] c = Arrays.stream(state.getStage().getCells()).map(char[]::clone).toArray(char[][]::new); // copy
-        IntStream.range(0, state.getStage().getTetramino().getShape().length).forEach(y ->
-                IntStream.range(0, state.getStage().getTetramino().getShape()[0].length).forEach(x -> {
-                    if (state.getStage().getTetramino().getShape()[y][x] != '0')
-                        c[state.getStage().getTetraminoY() + y][state.getStage().getTetraminoX() + x] = state.getStage().getTetramino().getShape()[y][x];
-                }));
+        final char[][] c = java.util.Arrays.stream(state.getStage().getCells()).map(char[]::clone).toArray(char[][]::new);
+        int startY = state.getStage().getTetraminoY();
+        int startX = state.getStage().getTetraminoX();
+        char[][] shape = state.getStage().getTetramino().getShape();
+
+        for (int y = 0; y < shape.length; y++) {
+            for (int x = 0; x < shape[y].length; x++) {
+                if (shape[y][x] != '0') {
+                    c[startY + y][startX + x] = shape[y][x];
+                }
+            }
+        }
         return c;
     }
 
     private char[][] makeEmptyMatrix() {
         final char[][] c = new char[HEIGHT][WIDTH];
-        IntStream.range(0, HEIGHT).forEach(y -> IntStream.range(0, WIDTH).forEach(x -> c[y][x] = '0'));
+        for (int y = 0; y < HEIGHT; y++) {
+            java.util.Arrays.fill(c[y], '0'); // Быстрое заполнение на уровне ОС
+        }
         return c;
     }
-
     private Tetramino getTetramino0() {
-        return buildTetramino(new char[][]{{'0'}});
+        return TETRAMINO_POOL.get('0');
     }
 
     private Tetramino buildTetramino(char[][] shape) {
@@ -284,8 +296,14 @@ public class PlayGame implements PlayGameService {
     private Optional<State> createStateWithNewTetramino(State state) {
         final Tetramino t = getRandomTetramino();
         State newState = burryTetramino(state).orElse(state);
-        newState = buildState(collapseFilledLayers(newState), newState.isRunning(), newState.getGame());
-        newState = updatePlayerScore(newState);
+
+        // 🔥 ИСПРАВЛЕНИЕ БАГА: Выполняем схлопывание ровно один раз!
+        Stage collapsedStage = collapseFilledLayers(newState);
+
+        // Пересчитываем очки математически корректно, без побочных вызовов
+        Game updatedGame = buildGame(newState.getGame().getPlayerName(), collapsedStage.getCollapsedLayersCount() * 10);
+        newState = buildState(collapsedStage, newState.isRunning(), updatedGame);
+
         newState = initiateTetramino(t, (WIDTH - t.getShape().length) / 2, 0, newState).orElse(newState);
         return !checkCollision(newState, 0, 0, false) ? Optional.of(newState) : Optional.empty();
     }
@@ -298,64 +316,78 @@ public class PlayGame implements PlayGameService {
     }
 
     private Tetramino getRandomTetramino() {
-        final Map<Character, Tetramino> tetraminoMap = new HashMap<>();
-        tetraminoMap.put('0', buildTetramino(new char[][]{{'0'}}));
-        tetraminoMap.put('I', buildTetramino(new char[][]{{'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}, {'0', 'I', '0', '0'}}));
-        tetraminoMap.put('J', buildTetramino(new char[][]{{'0', 'J', '0'}, {'0', 'J', '0'}, {'J', 'J', '0'}}));
-        tetraminoMap.put('L', buildTetramino(new char[][]{{'0', 'L', '0'}, {'0', 'L', '0'}, {'0', 'L', 'L'}}));
-        tetraminoMap.put('O', buildTetramino(new char[][]{{'O', 'O'}, {'O', 'O'}}));
-        tetraminoMap.put('S', buildTetramino(new char[][]{{'0', 'S', 'S'}, {'S', 'S', '0'}, {'0', '0', '0'}}));
-        tetraminoMap.put('T', buildTetramino(new char[][]{{'0', '0', '0'}, {'T', 'T', 'T'}, {'0', 'T', '0'}}));
-        tetraminoMap.put('Z', buildTetramino(new char[][]{{'Z', 'Z', '0'}, {'0', 'Z', 'Z'}, {'0', '0', '0'}}));
-        tetraminoMap.put('K', buildTetramino(new char[][]{{'K', 'K', 'K'}, {'0', 'K', '0'}, {'0', 'K', '0'}}));
-        final char[] tetraminos = "IJLOSTZK".toCharArray();
-        return tetraminoMap.get(tetraminos[new Random().nextInt(tetraminos.length)]);
+        return TETRAMINO_POOL.get(TETRAMINO_KEYS[RANDOM.nextInt(TETRAMINO_KEYS.length)]);
     }
 
     public Optional<State> burryTetramino(State state) {
         return Optional.of(buildState(buildStage(drawTetraminoOnCells(state), state.getStage().getTetramino(), state.getStage().getTetraminoX(), state.getStage().getTetraminoY(), state.getStage().getCollapsedLayersCount()), state.isRunning(), state.getGame()));
     }
 
-    private State updatePlayerScore(State state) {
-
-        return new State(collapseFilledLayers(state), state.isRunning(), buildGame(state.getGame().getPlayerName(), state.getStage().getCollapsedLayersCount() * 10));
-    }
-
     private Stage collapseFilledLayers(State state) {
-        final char[][] c = Arrays.stream(state.getStage().getCells()).map(char[]::clone).toArray(char[][]::new); // copy
-        final int[] ny2 = {0, HEIGHT - 1};
+        final char[][] originalCells = state.getStage().getCells();
+        final char[][] newCells = new char[HEIGHT][WIDTH];
 
-        IntStream.rangeClosed(0, HEIGHT - 1).forEach(y1 -> {
-            if (!isFull(state.getStage().getCells()[HEIGHT - 1 - y1])) {
-                System.arraycopy(c, HEIGHT - 1 - y1, c, ny2[1]--, 1);
+        int targetRow = HEIGHT - 1;
+        int collapsedCount = 0;
+
+        // Линейный проход снизу вверх вместо ресурсоемких стримов
+        for (int srcRow = HEIGHT - 1; srcRow >= 0; srcRow--) {
+            if (!isFull(originalCells[srcRow])) {
+                System.arraycopy(originalCells[srcRow], 0, newCells[targetRow], 0, WIDTH);
+                targetRow--;
             } else {
-                ny2[0]++;
+                collapsedCount++;
             }
-        });
-        return buildStage(c, state.getStage().getTetramino(), state.getStage().getTetraminoX(), state.getStage().getTetraminoY(), state.getStage().getCollapsedLayersCount() + ny2[0]);
+        }
+
+        // Заполняем оставшиеся пустые верхние строчки
+        while (targetRow >= 0) {
+            java.util.Arrays.fill(newCells[targetRow], '0');
+            targetRow--;
+        }
+
+        return buildStage(newCells, state.getStage().getTetramino(), state.getStage().getTetraminoX(), state.getStage().getTetraminoY(), state.getStage().getCollapsedLayersCount() + collapsedCount);
     }
 
     private boolean isFull(char[] row) {
-        return IntStream.range(0, row.length).noneMatch(i -> row[i] == '0');
+        for (char cell : row) {
+            if (cell == '0') return false;
+        }
+        return true;
     }
 
     private boolean checkCollision(State state, int dx, int dy, boolean rotate) {
         final char[][] m = rotate ? rotateMatrix(state.getStage().getTetramino().getShape()) : state.getStage().getTetramino().getShape();
-        final int h = m.length;
-        final int w = m[0].length;
-        return IntStream.range(0, h).anyMatch(y -> IntStream.range(0, w).anyMatch(x -> (
-                m[y][x] != '0' && ((state.getStage().getTetraminoY() + y + dy >= HEIGHT)
-                        || ((state.getStage().getTetraminoX() + x + dx) < 0)
-                        || ((state.getStage().getTetraminoX() + x + dx) >= WIDTH)
-                        || (state.getStage().getCells()[state.getStage().getTetraminoY() + y + dy][state.getStage().getTetraminoX() + x + dx] != '0'))
-        )));
+        int h = m.length;
+        int w = m[0].length;
+        int currentY = state.getStage().getTetraminoY();
+        int currentX = state.getStage().getTetraminoX();
+        char[][] cells = state.getStage().getCells();
+
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if (m[y][x] != '0') {
+                    int nextY = currentY + y + dy;
+                    int nextX = currentX + x + dx;
+
+                    if (nextY >= HEIGHT || nextX < 0 || nextX >= WIDTH || cells[nextY][nextX] != '0') {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private char[][] rotateMatrix(char[][] m) {
-        final int h = m.length;
-        final int w = m[0].length;
-        final char[][] t = new char[h][w];
-        IntStream.range(0, h).forEach(y -> IntStream.range(0, w).forEach(x -> t[w - x - 1][y] = m[y][x]));
+        int h = m.length;
+        int w = m[0].length;
+        char[][] t = new char[h][w];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                t[w - x - 1][y] = m[y][x];
+            }
+        }
         return t;
     }
 
