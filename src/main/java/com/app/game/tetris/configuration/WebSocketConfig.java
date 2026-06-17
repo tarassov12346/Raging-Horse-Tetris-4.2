@@ -1,5 +1,7 @@
 package com.app.game.tetris.configuration;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -14,10 +16,13 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+import java.util.Collections;
+import java.util.Map;
 
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+    private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -33,21 +38,28 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             public Message<?> preSend(Message<?> message, MessageChannel channel) {
                 StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-                if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                    // Берем данные, которые UserHandshakeInterceptor бережно достал из заголовков Гейтвея
-                    String userId = (String) accessor.getSessionAttributes().get("userId");
-                    String username = (String) accessor.getSessionAttributes().get("username");
+                if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+                    Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+
+                    // 🔥 ЗАЩИТНЫЙ БАРЬЕР: Предотвращаем NullPointerException при пустых атрибутах сессии
+                    if (sessionAttributes == null) {
+                        log.error("❌ [WS Auth] Отклонено: Атрибуты сессии WebSocket отсутствуют (Обход Gateway?)");
+                        return message;
+                    }
+
+                    String userId = (String) sessionAttributes.get("userId");
+                    String username = (String) sessionAttributes.get("username");
 
                     if (userId != null) {
                         String principalName = userId + ":" + (username != null ? username : "User");
                         UsernamePasswordAuthenticationToken auth =
-                                new UsernamePasswordAuthenticationToken(principalName, null, java.util.Collections.emptyList());
+                                new UsernamePasswordAuthenticationToken(principalName, null, Collections.emptyList());
                         accessor.setUser(auth);
-                        System.out.println("✅ WS Connected via Gateway: " + principalName);
+
+                        // 🔥 ЗАЩИТА ОТ PINNING: Заменяем System.out на неблокирующий SLF4J логгер
+                        log.info("✅ WS Connected via Gateway: {}", principalName);
                     } else {
-                        System.err.println("❌ WS Connection refused: No headers from Gateway");
-                        // Если хочешь жестко обрывать соединение:
-                        // throw new org.springframework.messaging.MessagingException("Unauthorized");
+                        log.warn("❌ [WS Auth] Подключение отклонено: В заголовках Gateway отсутствует X-User-Id");
                     }
                 }
                 return message;
