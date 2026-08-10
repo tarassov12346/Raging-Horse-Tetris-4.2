@@ -11,7 +11,7 @@
     <groupId>com.app.service</groupId>
     <artifactId>Raging-Horse-Tetris-4.2</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <packaging>war</packaging>
+    <packaging>jar</packaging>
     <name>Raging-Horse-Tetris-4.2</name>
     <description>Microservice project for Spring Boot</description>
     <url/>

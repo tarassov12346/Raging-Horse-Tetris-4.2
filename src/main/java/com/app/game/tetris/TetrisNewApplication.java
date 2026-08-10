@@ -16,5 +16,4 @@ public class TetrisNewApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(TetrisNewApplication.class, args);
 	}
-
 }

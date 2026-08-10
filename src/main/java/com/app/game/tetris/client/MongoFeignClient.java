@@ -10,12 +10,6 @@ import java.util.Optional;
         contextId = "mongoClient")
 public interface MongoFeignClient {
 
-    @PostMapping("/save")
-    void saveGame(@RequestBody SavedGame savedGame);
-
-    @GetMapping("/restart")
-    Optional<SavedGame> gameRestart(@RequestParam("playerName") String playerName);
-
     @DeleteMapping("/delete")
     void cleanSavedGameMongodb(@RequestParam("playerName") String playerName);
 
@@ -24,21 +18,8 @@ public interface MongoFeignClient {
     @PostMapping("/prepare")
     void prepareMongoDBForNewPLayer(@RequestParam("playerName") String playerName);
 
-
     @DeleteMapping("/delete_image")
     void cleanImageMongodb(@RequestParam("playerName") String playerName,
                            @RequestParam("fileName") String fileName);
 
-    @GetMapping("/bytes")
-    byte[] loadByteArrayFromMongodb(@RequestParam("playerName") String playerName,
-                                    @RequestParam("fileName") String fileName);
-
-    @PostMapping("/mugShot")
-    void loadMugShotIntoMongodb(@RequestParam("playerName") String playerName,
-                                @RequestBody byte[] data);
-
-    @PostMapping("/snapShot")
-    void loadSnapShotIntoMongodb(@RequestParam("playerName") String playerName,
-                                 @RequestParam("fileName") String fileName,
-                                 @RequestBody byte[] data);
 }
