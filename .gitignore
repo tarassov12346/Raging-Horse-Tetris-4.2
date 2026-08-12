@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Локальные отчеты автоматизации
+full-build-report.log
+
