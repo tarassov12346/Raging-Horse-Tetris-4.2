@@ -30,6 +30,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
@@ -564,47 +565,57 @@ public class TetrisController {
         if (currentState == null) return;
 
         String playerName = currentState.getGame().getPlayerName();
+        int playerScore = currentState.getGame().getPlayerScore();
 
-        // Переносим всю тяжелую логику (gRPC -> Скриншот -> MongoDB) в отдельный виртуальный поток
-        Thread.startVirtualThread(() -> {
-            try {
-                // 1. Синхронный запрос данных через gRPC
-                String rawData = gameService.getGameData(playerName);
-                if (rawData == null || rawData.isEmpty() || rawData.equals("{}")) return;
+        // Выделенный Executor на базе виртуальных потоков для неблокирующих I/O операций (gRPC, БД)
+        var virtualExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-                JSONObject jsonGameData = new JSONObject(rawData);
-                String bestPlayer = jsonGameData.optString("bestplayer", "None");
-                int bestScore = jsonGameData.optInt("bestscore", 0);
-                int playerBestScore = jsonGameData.optInt("playerbestscore", 0);
+        // 1. Асинхронно запрашиваем данные игрока через gRPC
+        CompletableFuture.supplyAsync(() -> gameService.getGameData(playerName), virtualExecutor)
+                .thenAcceptAsync(rawData -> {
+                    if (rawData == null || rawData.isEmpty() || rawData.equals("{}")) return;
 
-                // 2. Делаем обычный скриншот
-                // 🔥 МЕГА-УЛУЧШЕНИЕ: Вызываем .join(). Виртуальный поток СТОИТ И ЖДЕТ,
-                // пока Playwright физически не отрапортует, что файл лег на диск!
-                gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", playGameService, currentState, bestPlayer, bestScore).join();
+                    JSONObject jsonGameData = new JSONObject(rawData);
+                    String bestPlayer = jsonGameData.optString("bestplayer", "None");
+                    int bestScore = jsonGameData.optInt("bestscore", 0);
+                    int playerBestScore = jsonGameData.optInt("playerbestscore", 0);
 
-                // Теперь никакого Race Condition: файл СТОПРОЦЕНТНО на диске. Читаем его и пишем в Mongo
-                mongoService.cleanImageMongodb(playerName, "deskTopSnapShot");
-                mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShot");
+                    // 🔥 МГНОВЕННЫЙ ОТВЕТ: Отправляем финальный экран пользователю сразу,
+                    // не дожидаясь тяжелого рендеринга графики Playwright!
+                    displayService.sendFinalStateToBeDisplayed(playGameService, template, destinationId);
 
-                // 3. Если побит личный рекорд — делаем "Best" скриншот по такой же железной схеме
-                if (currentState.getGame().getPlayerScore() >= playerBestScore) {
-                    // Ждем завершения записи рекордного кадра
-                    gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", playGameService, currentState, bestPlayer, bestScore).join();
+                    // 2. ЗАПУСКАЕМ ЦЕПОЧКУ АРТЕФАКТОВ: Генерация обычного скриншота (улетает в пул Playwright)
+                    gameArtefactService.makeDesktopSnapshot("deskTopSnapShot", playGameService, currentState, bestPlayer, bestScore)
+                            // Этот блок выполнится в виртуальном потоке СТРОГО после того, как файл ляжет на диск
+                            .thenRunAsync(() -> {
+                                mongoService.cleanImageMongodb(playerName, "deskTopSnapShot");
+                                mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShot");
+                                log.info("📸 Обычный скриншот deskTopSnapShot для {} успешно сохранен в Mongo", playerName);
 
-                    mongoService.cleanImageMongodb(playerName, "deskTopSnapShotBest");
-                    mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShotBest");
-                }
+                                // 3. ПОСЛЕДОВАТЕЛЬНЫЙ ШАГ: Проверяем рекорд только после готовности первого скриншота!
+                                if (playerScore >= playerBestScore) {
+                                    log.info("🏆 Игрок {} побил личный рекорд ({} >= {}). Запуск рекордного скриншота...",
+                                            playerName, playerScore, playerBestScore);
 
-                // 4. Отправляем финальный экран пользователю
-                displayService.sendFinalStateToBeDisplayed(playGameService, template, destinationId);
-                log.info("📸 Скриншоты для {} успешно обработаны в виртуальном потоке через CompletableFuture.join()", playerName);
+                                    // Запускаем генерацию рекордного скриншота
+                                    gameArtefactService.makeDesktopSnapshot("deskTopSnapShotBest", playGameService, currentState, bestPlayer, bestScore)
+                                            // Выполнится строго после того, как "Best" кадр физически запишется на диск
+                                            .thenRunAsync(() -> {
+                                                mongoService.cleanImageMongodb(playerName, "deskTopSnapShotBest");
+                                                mongoService.loadSnapShotIntoMongodb(playerName, "deskTopSnapShotBest");
+                                                log.info("🏆 Рекордный скриншот deskTopSnapShotBest для {} успешно сохранен в Mongo", playerName);
+                                            }, virtualExecutor);
+                                }
 
-            } catch (Exception e) {
-                log.error("💥 Ошибка при создании скриншотов для {}: {}", playerName, e.getMessage());
-            }
-        });
+                            }, virtualExecutor);
 
+                }, virtualExecutor)
+                .exceptionally(e -> {
+                    log.error("💥 Критический сбой в асинхронной цепочке скриншотов для {}: {}", playerName, e.getMessage());
+                    return null;
+                });
     }
+
 
     @MessageMapping("/record")
     public void makeRecord(Principal principal) {
