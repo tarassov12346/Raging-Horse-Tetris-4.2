@@ -9,5 +9,8 @@ public interface UsersService {
     Users findUserById(Long userId);
     Users findUserByUserName(String userName);
     List<Users> getAllUsers();
-
+    // ДОБАВЛЯЕМ СЮДА:
+    boolean isRolesEmpty();
+    void prepareRolesDB();
+    void prepareUserDB();
 }

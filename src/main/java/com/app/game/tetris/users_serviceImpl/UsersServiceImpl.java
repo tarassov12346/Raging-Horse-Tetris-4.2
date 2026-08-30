@@ -88,5 +88,34 @@ public class UsersServiceImpl implements UsersService {
         return user;
     }
 
-    // 🔥 ОПТИМИЗАЦИЯ: Неиспользуемый метод mapToMsg удален (Dead Code Cleanup)
+    @Override
+    public boolean isRolesEmpty() {
+        try {
+            ActionResponse response = userStub.isRolesEmpty(UserEmpty.newBuilder().build());
+            return response.getSuccess();
+        } catch (StatusRuntimeException e) {
+            log.error("❌ Ошибка gRPC при проверке пустоты ролей: {}", e.getStatus());
+            return false;
+        }
+    }
+
+    @Override
+    public void prepareRolesDB() {
+        try {
+            userStub.prepareRolesDB(UserEmpty.newBuilder().build());
+            log.info("📡 gRPC: Сигнал на подготовку БД Ролей успешно отправлен");
+        } catch (StatusRuntimeException e) {
+            log.error("❌ Ошибка gRPC при подготовке БД Ролей: {}", e.getStatus());
+        }
+    }
+
+    @Override
+    public void prepareUserDB() {
+        try {
+            userStub.prepareUserDB(UserEmpty.newBuilder().build());
+            log.info("📡 gRPC: Сигнал на подготовку БД Пользователей успешно отправлен");
+        } catch (StatusRuntimeException e) {
+            log.error("❌ Ошибка gRPC при подготовке БД Пользователей: {}", e.getStatus());
+        }
+    }
 }
