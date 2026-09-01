@@ -99,7 +99,6 @@ public class TetrisController {
                     if (usersService.isRolesEmpty()) {
                         log.warn("⚠️ БД Ролей пуста! Запускается gRPC инициализация таблиц...");
                         usersService.prepareRolesDB();
-                        usersService.prepareUserDB();
                     } else {
                         log.info("✅ База данных микросервиса уже содержит роли.");
                     }
