@@ -44,8 +44,9 @@ jobs:
           
           echo "🚀 Найден активный Codespace: $CODESPACE_NAME. Отправляем команду обновления..."
           
-          # Подключаемся по SSH, переходим в папку полигона, стягиваем новый образ и перезапускаем raging-horse-tetris
-          gh cs ssh -c "$CODESPACE_NAME" -- "cd /workspaces/PWD-POLYGONE && docker compose pull raging-horse-tetris && docker compose up -d raging-horse-tetris"
+          # Подключаемся по SSH, переходим в папку полигона, стягиваем новый образ и запускаем tetris-game
+          gh cs ssh -c "$CODESPACE_NAME" -- "cd /workspaces/PWD-POLYGONE && docker compose pull tetris-game && docker compose up -d tetris-game"
         env:
           GH_TOKEN: ${{ secrets.MICROSERVICES_DEPLOY_TOKEN }}
+
 
