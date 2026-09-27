@@ -14,6 +14,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
 public class TetrisNewApplication {
 
 	public static void main(String[] args) {
+		// 🎯 ВПЕНДЮРИВАЕМ НАШУ ФИНАЛЬНУЮ МАРКИРОВКУ СЮДА:
+		System.out.println("🚀🚀🚀 [TETRIS-SERVER v6.0] КОНТЕЙНЕР УСПЕШНО ОБНОВЛЕН! Игровой движок реального времени запущен.");
 		SpringApplication.run(TetrisNewApplication.class, args);
 	}
 }
