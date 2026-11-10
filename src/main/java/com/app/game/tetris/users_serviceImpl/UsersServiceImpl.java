@@ -108,14 +108,4 @@ public class UsersServiceImpl implements UsersService {
             log.error("❌ Ошибка gRPC при подготовке БД Ролей: {}", e.getStatus());
         }
     }
-
-    @Override
-    public void prepareUserDB() {
-        try {
-            userStub.prepareUserDB(UserEmpty.newBuilder().build());
-            log.info("📡 gRPC: Сигнал на подготовку БД Пользователей успешно отправлен");
-        } catch (StatusRuntimeException e) {
-            log.error("❌ Ошибка gRPC при подготовке БД Пользователей: {}", e.getStatus());
-        }
-    }
 }

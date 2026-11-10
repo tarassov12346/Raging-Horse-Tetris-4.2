@@ -42,6 +42,4 @@ service UserService {
   rpc DeleteUser(IdRequest) returns (ActionResponse);
   rpc IsRolesEmpty(UserEmpty) returns (ActionResponse);
   rpc PrepareRolesDB(UserEmpty) returns (ActionResponse);
-  rpc PrepareUserDB(UserEmpty) returns (ActionResponse);
-
 }

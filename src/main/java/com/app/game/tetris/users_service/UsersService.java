@@ -12,5 +12,4 @@ public interface UsersService {
     // ДОБАВЛЯЕМ СЮДА:
     boolean isRolesEmpty();
     void prepareRolesDB();
-    void prepareUserDB();
 }
